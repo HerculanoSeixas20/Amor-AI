@@ -1,0 +1,23 @@
+[
+  {
+    "id": "H-B5304H35T",
+    "paymentId": "PAY-VTGDOOGR2",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "joeloliveira33@gmail.com",
+    "timestamp": "2026-09-09T14:35:09.911Z"
+  },
+  {
+    "id": "H-LQVD1I909",
+    "paymentId": "PAY-HPL23NP1H",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "chiilplaces9@gmail.com",
+    "timestamp": "2026-09-09T14:36:34.906Z"
+  },
+  {
+    "id": "H-U87KR4RQN",
+    "paymentId": "PAY-9QF1P1MFZ",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "test_user_auto@amoria.com",
+    "timestamp": "2026-09-09T14:41:48.273Z"
+  }
+]

@@ -1,0 +1,130 @@
+[
+  {
+    "email": "chillplaces9@gmail.com",
+    "name": "Desenvolvedor",
+    "plan": "Premium",
+    "password": "123",
+    "updatedAt": "2026-07-21T14:14:30.328Z",
+    "lastLogin": "2026-07-21T14:14:30.328Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Google",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA",
+    "sessions": [
+      "2026-07-21T10:03:09.402Z",
+      "2026-07-21T14:14:30.077Z",
+      "2026-07-21T14:14:30.328Z"
+    ]
+  },
+  {
+    "email": "cliente@amoria.com",
+    "name": "António (Cliente)",
+    "plan": "Free",
+    "password": "123",
+    "updatedAt": "2026-07-21T10:02:33.987Z"
+  },
+  {
+    "email": "mateus.m@gmail.com",
+    "name": "Mateus Manuel",
+    "plan": "Premium",
+    "password": "123",
+    "updatedAt": "2026-07-21T10:02:33.987Z"
+  },
+  {
+    "email": "joanap@gmail.com",
+    "name": "Joana Pereira",
+    "plan": "Free",
+    "password": "123",
+    "updatedAt": "2026-07-21T10:02:33.987Z"
+  },
+  {
+    "email": "anacustodio@netcabo.ao",
+    "name": "Ana Custódio",
+    "plan": "Free",
+    "password": "123",
+    "updatedAt": "2026-07-21T10:02:33.987Z"
+  },
+  {
+    "email": "joeloliveira33@gmail.com",
+    "name": "António Felipe",
+    "plan": "Free",
+    "password": "joeloliveira33",
+    "sessions": [
+      "2026-09-09T14:35:09.871Z",
+      "2026-09-09T14:35:10.205Z"
+    ],
+    "updatedAt": "2026-09-09T14:35:10.205Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Google",
+    "createdAt": "2026-09-09T14:35:09.871Z",
+    "lastLogin": "2026-09-09T14:35:10.205Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA",
+    "quizAnswers": {
+      "1": "salvar",
+      "2": "conflito_diario",
+      "3": "palavras",
+      "4": "aprendizagem"
+    }
+  },
+  {
+    "email": "chiilplaces9@gmail.com",
+    "name": "Herculano Seixas José",
+    "plan": "Premium",
+    "password": "kenyseixas9",
+    "sessions": [
+      "2026-09-09T14:36:34.906Z",
+      "2026-09-09T14:36:35.171Z"
+    ],
+    "updatedAt": "2026-09-09T14:36:35.171Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Google",
+    "createdAt": "2026-09-09T14:36:34.906Z",
+    "lastLogin": "2026-09-09T14:36:35.171Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA",
+    "quizAnswers": {
+      "1": "analisar",
+      "2": "rotina",
+      "3": "toque",
+      "4": "apenas_dicas"
+    }
+  },
+  {
+    "email": "test_user_auto@amoria.com",
+    "name": "Test User Auto",
+    "plan": "Free",
+    "password": "123",
+    "sessions": [
+      "2026-09-09T14:41:48.255Z"
+    ],
+    "updatedAt": "2026-09-09T14:41:48.255Z",
+    "lastLogin": "2026-09-09T14:41:48.255Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Email",
+    "createdAt": "2026-09-09T14:41:48.255Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA"
+  },
+  {
+    "email": "test_forgot_user@amoria.com",
+    "name": "Test Forgot User",
+    "plan": "Free",
+    "password": "123",
+    "sessions": [
+      "2026-09-09T14:41:52.303Z"
+    ],
+    "updatedAt": "2026-09-09T14:41:52.303Z",
+    "lastLogin": "2026-09-09T14:41:52.303Z",
+    "createdAt": "2026-09-09T14:41:52.303Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA",
+    "recoveryCode": "535336",
+    "recoveryCodeExpires": "2026-09-09T14:56:52.303Z"
+  }
+]

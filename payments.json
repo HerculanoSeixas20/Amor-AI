@@ -1,0 +1,59 @@
+[
+  {
+    "paymentId": "PAY-VTGDOOGR2",
+    "transactionId": "TX-KLHOP2",
+    "email": "joeloliveira33@gmail.com",
+    "name": "António Felipe",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "09/09/2026",
+    "time": "14:35:09",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-09T14:35:09.872Z",
+    "updatedAt": "2026-09-09T14:35:09.872Z",
+    "auditLogs": [
+      "[2026-09-09T14:35:09.872Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-HPL23NP1H",
+    "transactionId": "TX-M12FZI",
+    "email": "chiilplaces9@gmail.com",
+    "name": "Herculano Seixas José",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "09/09/2026",
+    "time": "14:36:34",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-09T14:36:34.906Z",
+    "updatedAt": "2026-09-09T14:36:34.906Z",
+    "auditLogs": [
+      "[2026-09-09T14:36:34.906Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-9QF1P1MFZ",
+    "transactionId": "TX-ZR6AA7",
+    "email": "test_user_auto@amoria.com",
+    "name": "Test User Auto",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "09/09/2026",
+    "time": "14:41:48",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-09T14:41:48.256Z",
+    "updatedAt": "2026-09-09T14:41:48.256Z",
+    "auditLogs": [
+      "[2026-09-09T14:41:48.256Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  }
+]

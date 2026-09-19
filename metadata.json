@@ -1,0 +1,6 @@
+{
+  "name": "Amor IA",
+  "description": "Plataforma premium de IA para relações. Melhore a sua comunicação, resolva conflitos, reconquiste o seu amor e construa uma relação saudável.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
