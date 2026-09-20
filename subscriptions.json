@@ -126,5 +126,22 @@
     "currency": "AOA",
     "recoveryCode": "535336",
     "recoveryCodeExpires": "2026-09-09T14:56:52.303Z"
+  },
+  {
+    "email": "testuser@example.com",
+    "name": "Test User",
+    "plan": "Free",
+    "password": "password123",
+    "sessions": [
+      "2026-09-20T16:23:58.196Z"
+    ],
+    "updatedAt": "2026-09-20T16:23:58.196Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Google",
+    "createdAt": "2026-09-20T16:23:58.196Z",
+    "lastLogin": "2026-09-20T16:23:58.196Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA"
   }
 ]

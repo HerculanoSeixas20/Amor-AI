@@ -22,6 +22,7 @@ import {
   UserX,
   HelpCircle
 } from "lucide-react";
+import { apiFetch as fetch } from "../utils/api";
 
 interface SubscriptionViewProps {
   currentPlan: "Free" | "Premium";

@@ -55,5 +55,43 @@
     "auditLogs": [
       "[2026-09-09T14:41:48.256Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
     ]
+  },
+  {
+    "paymentId": "PAY-6KOSRUWED",
+    "transactionId": "TX-YPJWVU",
+    "email": "testuser@example.com",
+    "name": "Test User",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "20/09/2026",
+    "time": "16:23:58",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-20T16:23:58.196Z",
+    "updatedAt": "2026-09-20T16:23:58.196Z",
+    "auditLogs": [
+      "[2026-09-20T16:23:58.196Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-D7Z5F9XPM",
+    "transactionId": "TX-0Q785X",
+    "email": "teste_amor_ia@exemplo.com",
+    "name": "Utilizador Teste",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "20/09/2026",
+    "time": "16:30:14",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-20T16:30:14.241Z",
+    "updatedAt": "2026-09-20T16:30:14.241Z",
+    "auditLogs": [
+      "[2026-09-20T16:30:14.241Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
   }
 ]

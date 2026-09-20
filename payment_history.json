@@ -19,5 +19,19 @@
     "event": "Comprovativo enviado automaticamente por interação do utilizador",
     "user": "test_user_auto@amoria.com",
     "timestamp": "2026-09-09T14:41:48.273Z"
+  },
+  {
+    "id": "H-NFKQS0NZI",
+    "paymentId": "PAY-6KOSRUWED",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "testuser@example.com",
+    "timestamp": "2026-09-20T16:23:58.204Z"
+  },
+  {
+    "id": "H-XOT3C53Q7",
+    "paymentId": "PAY-D7Z5F9XPM",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "teste_amor_ia@exemplo.com",
+    "timestamp": "2026-09-20T16:30:14.253Z"
   }
 ]

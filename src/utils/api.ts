@@ -1,3 +1,8 @@
+/**
+ * apiFetch - Utilitário central de rede com blindagem contra erros de JSON
+ * Garante que qualquer resposta HTML (ex: 302, 404, 502) nunca cause SyntaxError ao chamar .json()
+ */
+
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const provider = localStorage.getItem("amor_ia_ai_provider") || "gemini";
   const savedUser = localStorage.getItem("amor_ia_user");
@@ -23,10 +28,68 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   if (isApiCall) {
     headers["x-ai-provider"] = provider;
     headers["x-user-email"] = userEmail;
+    if (!headers["X-Request-ID"]) {
+      headers["X-Request-ID"] = (typeof crypto !== "undefined" && crypto.randomUUID) 
+        ? crypto.randomUUID() 
+        : "req_" + Math.random().toString(36).substring(2, 9);
+    }
   }
 
-  return window.fetch(input, {
-    ...init,
-    headers,
-  });
+  try {
+    const response = await window.fetch(input, {
+      ...init,
+      headers,
+    });
+
+    // Blindagem de .json() para impedir "Unexpected token 'T', 'The page c...' is not valid JSON"
+    const originalJson = response.json.bind(response);
+    response.json = async () => {
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await response.text().catch(() => "");
+        const preview = text.substring(0, 100);
+        console.error(`[apiFetch non-JSON response] ${url} Status: ${response.status}:`, preview);
+
+        let friendlyMsg = "O servidor devolveu uma resposta inesperada. Por favor, tente novamente.";
+        if (response.status === 404) {
+          friendlyMsg = "Endpoint de serviço não encontrado (404).";
+        } else if (response.status >= 500) {
+          friendlyMsg = "Serviço temporariamente indisponível. A restabelecer ligação...";
+        }
+
+        return {
+          success: false,
+          error: friendlyMsg,
+          rawPreview: preview,
+          status: response.status
+        };
+      }
+
+      try {
+        return await originalJson();
+      } catch (jsonErr) {
+        console.error(`[apiFetch JSON parse error] ${url}:`, jsonErr);
+        return {
+          success: false,
+          error: "Dados recebidos em formato não reconhecido. Tente novamente.",
+          status: response.status
+        };
+      }
+    };
+
+    return response;
+  } catch (netErr: any) {
+    console.error(`[apiFetch network failure] ${url}:`, netErr);
+    // Retornar um objeto Response emulado para evitar crash instantâneo
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Falha de ligação ao servidor. Verifique a sua ligação à internet."
+      }),
+      {
+        status: 503,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
+  }
 }

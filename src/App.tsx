@@ -26,6 +26,7 @@ import {
 
 import { Crown, HelpCircle, Activity, Sparkles, LogOut, Check, Heart, MessageSquare, Compass, Zap, Database, Plus, X, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { apiRequest } from "./lib/apiClient";
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -146,10 +147,9 @@ export default function App() {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Registar ou obter utilizador no servidor
-    fetch("/api/register-user", {
+    // Registar ou obter utilizador no servidor de forma segura
+    apiRequest<{ success: boolean; user?: any }>("/api/register-user", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ 
         email: cleanEmail, 
         name: userName,
@@ -160,7 +160,6 @@ export default function App() {
         currency: currency || "AOA"
       })
     })
-      .then(res => res.json())
       .then(data => {
         const liveUser = (data.success && data.user) ? data.user : { 
           email: cleanEmail, 
@@ -220,8 +219,8 @@ export default function App() {
         setUserProfile(updatedProfile);
       })
       .catch(err => {
-        console.error("Erro ao registar no servidor:", err);
-        // Fallback local se o servidor falhar
+        console.warn("Aviso na sincronização de utilizador:", err);
+        // Fallback resiliente usando dados locais em caso de desconexão momentânea
         const fallbackUser = { 
           email: cleanEmail, 
           name: userName, 
@@ -268,12 +267,10 @@ export default function App() {
   const handleDeleteAccount = () => {
     if (!authState.user?.email) return;
     
-    fetch("/api/delete-account", {
+    apiRequest<{ success: boolean }>("/api/delete-account", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: authState.user.email })
     })
-      .then(res => res.json())
       .then(data => {
         if (data.success) {
           handleLogout();
@@ -303,9 +300,8 @@ export default function App() {
       setAuthState(prev => ({ ...prev, user: updatedUser }));
       localStorage.setItem("amor_ia_user", JSON.stringify(updatedUser));
       
-      fetch("/api/register-user", {
+      apiRequest("/api/register-user", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: authState.user.email,
           name: updatedProfile.name,
@@ -324,9 +320,8 @@ export default function App() {
     const nextPlan = currentPlan === "Premium" ? "Free" : "Premium";
     
     // Atualizar no servidor se for alterado localmente
-    fetch("/api/admin/update-subscription", {
+    apiRequest("/api/admin/update-subscription", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: authState.user?.email, plan: nextPlan })
     }).catch(e => console.error(e));
 

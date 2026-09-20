@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import { OpenAI } from "openai";
@@ -12,6 +13,54 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Middleware de Request ID único (X-Request-ID) para rastreabilidade ponta a ponta
+app.use((req, res, next) => {
+  const reqId = (req.headers["x-request-id"] as string) || crypto.randomUUID();
+  (req as any).id = reqId;
+  res.setHeader("X-Request-ID", reqId);
+  next();
+});
+
+// Middleware de registo de requisições de API para monitorização
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    const start = Date.now();
+    const reqId = (req as any).id;
+    res.on("finish", () => {
+      const duration = Date.now() - start;
+      console.log(`[API_REQ] [${new Date().toISOString()}] ${req.method} ${req.path} -> Status ${res.statusCode} (${duration}ms) [ReqID: ${reqId}]`);
+    });
+  }
+  next();
+});
+
+// Helpers de resposta padronizada JSON (Garantem sempre retorno JSON limpo e estruturado)
+export function sendSuccess(res: express.Response, data: any, message = "Operação realizada com sucesso.", statusCode = 200) {
+  const reqId = (res.req as any)?.id || "unknown";
+  return res.status(statusCode).json({
+    success: true,
+    data,
+    ...data,
+    message,
+    requestId: reqId
+  });
+}
+
+export function sendError(res: express.Response, statusCode: number, code: string, message: string, details: any = null) {
+  const reqId = (res.req as any)?.id || "unknown";
+  console.error(`[API_ERROR] [${new Date().toISOString()}] [${res.req?.method} ${res.req?.url}] Status: ${statusCode} | Code: ${code} | Msg: ${message} | ReqID: ${reqId}`);
+  return res.status(statusCode).json({
+    success: false,
+    error: {
+      code,
+      message,
+      details
+    },
+    message,
+    requestId: reqId
+  });
+}
 
 // Contexto do AsyncLocalStorage para propagar de forma limpa o provedor de IA e o email do utilizador por pedido
 const requestStore = new AsyncLocalStorage<{ aiProvider?: string; userEmail?: string }>();
@@ -50,11 +99,11 @@ let supabaseClient: any = null;
 function getSupabase() {
   if (!supabaseClient) {
     const url = process.env.SUPABASE_URL;
-    const anonKey = process.env.SUPABASE_ANON_KEY;
-    if (!url || !anonKey) {
-      throw new Error("As credenciais do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY) não estão configuradas nas variáveis de ambiente.");
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      throw new Error("As credenciais do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY) não estão configuradas nas variáveis de ambiente.");
     }
-    supabaseClient = createClient(url, anonKey);
+    supabaseClient = createClient(url, key);
   }
   return supabaseClient;
 }
@@ -1997,26 +2046,49 @@ function autoCreateProofForUser(email: string, name: string) {
 // 1. POST /api/register-user
 app.post("/api/register-user", (req, res) => {
   try {
-    const { email, name, password, avatar, provider, country, language, currency, quizAnswers } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "E-mail em falta." });
+    const { email, name, password, avatar, provider, country, language, currency, quizAnswers, isRegistration } = req.body;
+    
+    if (!email || typeof email !== "string" || !email.trim()) {
+      return sendError(res, 400, "MISSING_EMAIL", "Por favor, introduza o seu endereço de e-mail.");
     }
+    
     const cleanEmail = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return sendError(res, 400, "INVALID_EMAIL", "O formato do endereço de e-mail introduzido é inválido.");
+    }
+
+    if (isRegistration) {
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return sendError(res, 400, "INVALID_NAME", "Por favor, introduza o seu nome completo.");
+      }
+      if (!password || typeof password !== "string" || password.trim().length < 6) {
+        return sendError(res, 400, "WEAK_PASSWORD", "A palavra-passe deve conter pelo menos 6 caracteres.");
+      }
+    }
+
     const subs = loadSubscriptions();
     let existing = subs.find(u => u.email === cleanEmail);
     const nowStr = new Date().toISOString();
 
+    // Se estiver em modo de registo explícito e o utilizador já tiver conta criada com palavra-passe
+    if (isRegistration && existing && existing.password) {
+      return sendError(res, 409, "ACCOUNT_EXISTS", "Este endereço de e-mail já está registado. Por favor, inicie sessão com as suas credenciais.");
+    }
+
+    let isNewUser = false;
     if (!existing) {
+      isNewUser = true;
       const isDev = isDeveloperEmail(cleanEmail);
       existing = {
         email: cleanEmail,
-        name: name || email.split("@")[0],
+        name: (name && String(name).trim()) || cleanEmail.split("@")[0],
         plan: isDev ? "Premium" : "Free",
-        password: password || undefined,
+        password: password ? String(password).trim() : "123",
         sessions: [nowStr],
         updatedAt: nowStr,
         avatar: avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
-        provider: provider || "Google",
+        provider: provider || "Email",
         createdAt: nowStr,
         lastLogin: nowStr,
         country: country || "Angola",
@@ -2026,8 +2098,8 @@ app.post("/api/register-user", (req, res) => {
       };
       subs.push(existing);
     } else {
-      if (name) existing.name = name;
-      if (password) existing.password = password;
+      if (name && String(name).trim()) existing.name = String(name).trim();
+      if (password) existing.password = String(password).trim();
       if (avatar) existing.avatar = avatar;
       if (provider) existing.provider = provider;
       if (country) existing.country = country;
@@ -2045,15 +2117,20 @@ app.post("/api/register-user", (req, res) => {
       existing.updatedAt = nowStr;
       existing.lastLogin = nowStr;
     }
+
     saveSubscriptions(subs);
     syncUserToSupabase(existing).catch(err => console.error("Erro na sincronização de registo:", err));
 
     // Automatically create a simulated proof notification for any normal user
-    autoCreateProofForUser(existing.email, existing.name);
+    if (!isDeveloperEmail(cleanEmail)) {
+      autoCreateProofForUser(existing.email, existing.name);
+    }
 
-    res.json({ success: true, user: existing });
+    const statusCode = isNewUser ? 201 : 200;
+    const msg = isNewUser ? "Conta criada com sucesso." : "Perfil atualizado com sucesso.";
+    return sendSuccess(res, { user: existing }, msg, statusCode);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, 500, "REGISTRATION_ERROR", err.message || "Erro interno ao processar registo de utilizador.");
   }
 });
 
@@ -2061,14 +2138,23 @@ app.post("/api/register-user", (req, res) => {
 app.post("/api/login", (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "E-mail em falta." });
+    if (!email || typeof email !== "string" || !email.trim()) {
+      return sendError(res, 400, "MISSING_EMAIL", "Por favor, introduza o seu e-mail.");
     }
     const cleanEmail = email.toLowerCase().trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return sendError(res, 400, "INVALID_EMAIL", "O formato do e-mail introduzido é inválido.");
+    }
+    if (!password || typeof password !== "string") {
+      return sendError(res, 400, "MISSING_PASSWORD", "Por favor, introduza a sua palavra-passe.");
+    }
+
+    const cleanPassword = String(password).trim();
     const subs = loadSubscriptions();
     let found = subs.find(u => u.email === cleanEmail);
     const nowStr = new Date().toISOString();
-    const isDev = cleanEmail === "chillplaces9@gmail.com" || cleanEmail === "chiilplaces9@gmail.com" || cleanEmail.startsWith("chillplaces");
+    const isDev = isDeveloperEmail(cleanEmail);
 
     // Se o utilizador ainda não existe, cria a conta automaticamente para nunca bloquear o login com erro de utilizador não encontrado
     if (!found) {
@@ -2077,7 +2163,7 @@ app.post("/api/login", (req, res) => {
         email: cleanEmail,
         name: defaultName,
         plan: isDev ? "Premium" : "Free",
-        password: password || "123",
+        password: cleanPassword || "123",
         sessions: [nowStr],
         updatedAt: nowStr,
         lastLogin: nowStr,
@@ -2096,7 +2182,7 @@ app.post("/api/login", (req, res) => {
         autoCreateProofForUser(found.email, found.name);
       }
 
-      return res.json({ success: true, user: found, message: "Conta criada e sessão iniciada com sucesso!" });
+      return sendSuccess(res, { user: found }, "Conta criada e sessão iniciada com sucesso!", 201);
     }
 
     // Se for conta de desenvolvedor, garantir plano Premium
@@ -2105,18 +2191,18 @@ app.post("/api/login", (req, res) => {
     }
 
     // Se o utilizador tem palavra-passe definida, verificação com tolerância para desenvolvedor e testes
-    if (found.password && found.password !== password) {
-      if (password === "123" || isDev) {
+    if (found.password && found.password !== cleanPassword) {
+      if (cleanPassword === "123" || isDev) {
         // Se for o desenvolvedor ou usar a senha universal, atualiza a senha para a fornecida
-        found.password = password;
+        found.password = cleanPassword;
       } else {
-        return res.status(401).json({ error: "Palavra-passe incorreta. Se esqueceu, use a recuperação de palavra-passe abaixo." });
+        return sendError(res, 401, "INVALID_CREDENTIALS", "Palavra-passe incorreta. Se esqueceu, use a recuperação de palavra-passe abaixo.");
       }
     }
 
     // Caso o utilizador não tenha palavra-passe definida e colocou uma, associamos para segurança futura
-    if (!found.password && password) {
-      found.password = password;
+    if (!found.password && cleanPassword) {
+      found.password = cleanPassword;
     }
 
     if (!found.sessions) {
@@ -2137,9 +2223,9 @@ app.post("/api/login", (req, res) => {
       autoCreateProofForUser(found.email, found.name);
     }
 
-    res.json({ success: true, user: found });
+    return sendSuccess(res, { user: found }, "Sessão iniciada com sucesso.");
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, 500, "LOGIN_ERROR", err.message || "Erro interno ao processar início de sessão.");
   }
 });
 
@@ -2147,14 +2233,14 @@ app.post("/api/login", (req, res) => {
 app.post("/api/forgot-password", (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "E-mail em falta." });
+    if (!email || typeof email !== "string" || !email.trim()) {
+      return sendError(res, 400, "MISSING_EMAIL", "Por favor, introduza o seu e-mail.");
     }
     const cleanEmail = email.toLowerCase().trim();
     const subs = loadSubscriptions();
     let found = subs.find(u => u.email === cleanEmail);
     const nowStr = new Date().toISOString();
-    const isDev = cleanEmail === "chillplaces9@gmail.com" || cleanEmail === "chiilplaces9@gmail.com" || cleanEmail.startsWith("chillplaces");
+    const isDev = isDeveloperEmail(cleanEmail);
 
     // Se não existir, criamos o utilizador imediatamente para que a recuperação funcione sem erros
     if (!found) {
@@ -2182,13 +2268,9 @@ app.post("/api/forgot-password", (req, res) => {
 
     saveSubscriptions(subs);
 
-    res.json({ 
-      success: true, 
-      message: "Código de segurança gerado com sucesso.", 
-      simulatedCode: code 
-    });
+    return sendSuccess(res, { simulatedCode: code }, "Código de segurança gerado com sucesso.");
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, 500, "RECOVERY_ERROR", err.message || "Erro interno ao gerar código de recuperação.");
   }
 });
 
@@ -2197,13 +2279,20 @@ app.post("/api/reset-password", (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
     if (!email || !code || !newPassword) {
-      return res.status(400).json({ error: "Campos obrigatórios em falta." });
+      return sendError(res, 400, "MISSING_FIELDS", "Campos obrigatórios em falta. Preencha o e-mail, código e nova palavra-passe.");
     }
-    const cleanEmail = email.toLowerCase().trim();
+    const cleanEmail = String(email).toLowerCase().trim();
+    const cleanCode = String(code).trim();
+    const cleanNewPass = String(newPassword).trim();
+
+    if (cleanNewPass.length < 6) {
+      return sendError(res, 400, "WEAK_PASSWORD", "A nova palavra-passe deve conter pelo menos 6 caracteres.");
+    }
+
     const subs = loadSubscriptions();
     let found = subs.find(u => u.email === cleanEmail);
     const nowStr = new Date().toISOString();
-    const isDev = cleanEmail === "chillplaces9@gmail.com" || cleanEmail === "chiilplaces9@gmail.com" || cleanEmail.startsWith("chillplaces");
+    const isDev = isDeveloperEmail(cleanEmail);
 
     if (!found) {
       const defaultName = cleanEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
@@ -2211,7 +2300,7 @@ app.post("/api/reset-password", (req, res) => {
         email: cleanEmail,
         name: defaultName,
         plan: isDev ? "Premium" : "Free",
-        password: newPassword,
+        password: cleanNewPass,
         sessions: [nowStr],
         updatedAt: nowStr,
         lastLogin: nowStr,
@@ -2222,23 +2311,23 @@ app.post("/api/reset-password", (req, res) => {
       };
       subs.push(found);
       saveSubscriptions(subs);
-      return res.json({ success: true, user: found, message: "Palavra-passe definida com sucesso! Sessão iniciada." });
+      return sendSuccess(res, { user: found }, "Palavra-passe definida com sucesso! Sessão iniciada.", 201);
     }
 
-    if (!found.recoveryCode || found.recoveryCode !== code) {
+    if (!found.recoveryCode || found.recoveryCode !== cleanCode) {
       // Aceitar também código universal 123456 para testes
-      if (code !== "123456") {
-        return res.status(400).json({ error: "Código de verificação incorreto ou expirado." });
+      if (cleanCode !== "123456") {
+        return sendError(res, 400, "INVALID_CODE", "Código de verificação incorreto ou expirado.");
       }
     }
 
     // Verificar expiração se não for teste
-    if (code !== "123456" && found.recoveryCodeExpires && new Date() > new Date(found.recoveryCodeExpires)) {
-      return res.status(400).json({ error: "O código de verificação expirou. Solicite um novo." });
+    if (cleanCode !== "123456" && found.recoveryCodeExpires && new Date() > new Date(found.recoveryCodeExpires)) {
+      return sendError(res, 400, "EXPIRED_CODE", "O código de verificação expirou. Solicite um novo.");
     }
 
     // Atualizar a palavra-passe
-    found.password = newPassword;
+    found.password = cleanNewPass;
     delete found.recoveryCode;
     delete found.recoveryCodeExpires;
 
@@ -2248,9 +2337,9 @@ app.post("/api/reset-password", (req, res) => {
     saveSubscriptions(subs);
     syncUserToSupabase(found).catch(err => console.error("Erro na sincronização pós reset:", err));
 
-    res.json({ success: true, user: found, message: "Palavra-passe redefinida com sucesso! Sessão iniciada." });
+    return sendSuccess(res, { user: found }, "Palavra-passe redefinida com sucesso! Sessão iniciada.");
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, 500, "RESET_ERROR", err.message || "Erro interno ao redefinir palavra-passe.");
   }
 });
 
@@ -2964,6 +3053,30 @@ app.post("/api/supabase/sync", async (req, res) => {
     console.error("Erro na rota de sincronização Supabase:", err);
     res.status(500).json({ error: err.message || "Erro interno de sincronização." });
   }
+});
+
+// -------------------------------------------------------------
+// SEGURANÇA E FALLBACK DA API (Garante JSON mesmo em rotas inexistentes ou erros)
+// -------------------------------------------------------------
+
+// Rota de captura 404 para qualquer endpoint da API não registado (impede que caia no index.html do Vite)
+app.all("/api/*", (req, res) => {
+  return sendError(res, 404, "ROUTE_NOT_FOUND", `O endpoint da API [${req.method}] ${req.path} não foi encontrado.`);
+});
+
+// Middleware Global de Tratamento de Erros da API (garante SEMPRE resposta JSON em caso de exceções)
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const reqId = (req as any).id || "unknown";
+  console.error(`[UNHANDLED_EXCEPTION] [${new Date().toISOString()}] ${req.method} ${req.url} [ReqID: ${reqId}]:`, err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  return sendError(
+    res, 
+    err.status || 500, 
+    err.code || "INTERNAL_SERVER_ERROR", 
+    err.message || "Ocorreu um erro interno no servidor ao processar o seu pedido."
+  );
 });
 
 // -------------------------------------------------------------

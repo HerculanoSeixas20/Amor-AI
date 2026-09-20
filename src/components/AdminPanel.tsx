@@ -4,6 +4,7 @@ import {
   Activity, Gift, Terminal, Search, UserPlus, CheckCircle, XCircle, Sparkles, Loader2, RefreshCw, FileText,
   Crown, Clock
 } from "lucide-react";
+import { apiFetch as fetch } from "../utils/api";
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<"users" | "payments" | "stats" | "coupons" | "logs">("payments");

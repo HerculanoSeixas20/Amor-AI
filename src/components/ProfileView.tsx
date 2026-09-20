@@ -4,6 +4,7 @@ import {
   User, Mail, Crown, Shield, Sparkles, Heart, Clock, CheckCircle, XCircle, Search, Edit2
 } from "lucide-react";
 import AdminPanel from "./AdminPanel";
+import { apiFetch as fetch } from "../utils/api";
 
 interface ProfileViewProps {
   userProfile: any;

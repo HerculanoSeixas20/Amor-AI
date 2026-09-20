@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Heart, Mail, Lock, User, Sparkles, ShieldCheck, Eye, EyeOff, ArrowRight, Check, AlertCircle, Info, ChevronRight, Laptop
+  Heart, Mail, Lock, User, Sparkles, ShieldCheck, Eye, EyeOff, ArrowRight, Check, AlertCircle, Info, ChevronRight, Laptop,
+  Sun, Moon
 } from "lucide-react";
 import { AuthState } from "../types";
+import { apiRequest, ApiError } from "../lib/apiClient";
 
 interface LoginProps {
   onLoginSuccess: (email: string, name: string, plan: "Free" | "Premium") => void;
@@ -113,6 +115,31 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [calculatingProgress, setCalculatingProgress] = useState<number>(0);
   const [calculatingStepMsg, setCalculatingStepMsg] = useState<string>("");
   
+  // Theme state: dark or light
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    return (localStorage.getItem("amor_ia_theme") as "dark" | "light") || "dark";
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("amor_ia_theme");
+    if (saved === "light") {
+      document.body.classList.add("theme-light");
+    } else {
+      document.body.classList.remove("theme-light");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    if (nextTheme === "light") {
+      document.body.classList.add("theme-light");
+    } else {
+      document.body.classList.remove("theme-light");
+    }
+    localStorage.setItem("amor_ia_theme", nextTheme);
+  };
+
   // Rotating tips state
   const [tipIndex, setTipIndex] = useState(0);
 
@@ -156,8 +183,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   }, [quizStep]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     setIsLoading(true);
     setMessage(null);
     setError(null);
@@ -170,74 +199,56 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       return;
     }
 
-    if (isForgotPassword) {
-      if (!isCodeSent) {
-        // Enviar código de recuperação
-        fetch("/api/forgot-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: trimmedEmail })
-        })
-          .then(res => {
-            if (!res.ok) {
-              return res.json().then(errData => {
-                throw new Error(errData.error || "Erro ao solicitar código de recuperação.");
-              });
-            }
-            return res.json();
-          })
-          .then(data => {
-            setIsLoading(false);
-            if (data.success) {
-              setIsCodeSent(true);
-              setSimulatedCode(data.simulatedCode);
-              setMessage("Código de segurança gerado para fins de verificação.");
-            } else {
-              setError(data.error || "Erro ao gerar código.");
-            }
-          })
-          .catch(err => {
-            setIsLoading(false);
-            setError(err.message || "Erro de ligação ao servidor.");
-            console.error(err);
-          });
-      } else {
-        // Confirmar código e redefinir senha
-        if (!recoveryCode.trim() || !newPassword.trim()) {
-          setError("Por favor, preencha o código de verificação de 6 dígitos e a nova palavra-passe.");
-          setIsLoading(false);
-          return;
-        }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError("Por favor, introduza um endereço de e-mail válido (exemplo: utilizador@dominio.com).");
+      setIsLoading(false);
+      return;
+    }
 
-        fetch("/api/reset-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: trimmedEmail, code: recoveryCode.trim(), newPassword })
-        })
-          .then(res => {
-            if (!res.ok) {
-              return res.json().then(errData => {
-                throw new Error(errData.error || "Código de verificação incorreto ou expirado.");
-              });
-            }
-            return res.json();
-          })
-          .then(data => {
-            setIsLoading(false);
-            if (data.success && data.user) {
-              setMessage("Palavra-passe atualizada com sucesso! A iniciar sessão...");
-              setTimeout(() => {
-                onLoginSuccess(data.user.email, data.user.name, data.user.plan);
-              }, 1200);
-            } else {
-              setError(data.error || "Erro ao atualizar palavra-passe.");
-            }
-          })
-          .catch(err => {
-            setIsLoading(false);
-            setError(err.message || "Erro de ligação ao servidor.");
-            console.error(err);
+    if (isForgotPassword) {
+      try {
+        if (!isCodeSent) {
+          // Enviar código de recuperação
+          const data = await apiRequest<{ success: boolean; simulatedCode?: string; message?: string }>("/api/forgot-password", {
+            method: "POST",
+            body: JSON.stringify({ email: trimmedEmail })
           });
+          setIsLoading(false);
+          if (data.success) {
+            setIsCodeSent(true);
+            setSimulatedCode(data.simulatedCode || null);
+            setMessage("Código de segurança gerado para fins de verificação.");
+          }
+        } else {
+          // Confirmar código e redefinir senha
+          if (!recoveryCode.trim() || !newPassword.trim()) {
+            setError("Por favor, preencha o código de verificação de 6 dígitos e a nova palavra-passe.");
+            setIsLoading(false);
+            return;
+          }
+          if (newPassword.trim().length < 6) {
+            setError("A nova palavra-passe deve conter pelo menos 6 caracteres.");
+            setIsLoading(false);
+            return;
+          }
+
+          const data = await apiRequest<{ success: boolean; user?: any }>("/api/reset-password", {
+            method: "POST",
+            body: JSON.stringify({ email: trimmedEmail, code: recoveryCode.trim(), newPassword: newPassword.trim() })
+          });
+          setIsLoading(false);
+          if (data.success && data.user) {
+            setMessage("Palavra-passe atualizada com sucesso! A iniciar sessão...");
+            setTimeout(() => {
+              onLoginSuccess(data.user.email, data.user.name, data.user.plan);
+            }, 1200);
+          }
+        }
+      } catch (err: any) {
+        setIsLoading(false);
+        setError(err.message || "Erro de ligação ao servidor.");
+        console.error("Erro na recuperação de palavra-passe:", err);
       }
       return;
     }
@@ -250,82 +261,63 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     if (isSignUp) {
       if (!name.trim()) {
-        setError("Por favor, introduza o seu nome.");
+        setError("Por favor, introduza o seu nome completo.");
+        setIsLoading(false);
+        return;
+      }
+      if (password.length < 6) {
+        setError("A palavra-passe deve conter pelo menos 6 caracteres.");
         setIsLoading(false);
         return;
       }
 
-      // Registo real no backend
-      fetch("/api/register-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, name, password, quizAnswers: selectedAnswers })
-      })
-        .then(res => {
-          if (!res.ok) {
-            return res.json().then(errData => {
-              throw new Error(errData.error || "Erro ao criar conta no servidor.");
-            });
-          }
-          return res.json();
-        })
-        .then(data => {
-          setIsLoading(false);
-          if (data.success && data.user) {
-            onLoginSuccess(data.user.email, data.user.name, data.user.plan);
-          } else {
-            setError(data.error || "Erro ao criar conta.");
-          }
-        })
-        .catch(err => {
-          setIsLoading(false);
-          setError(err.message || "Erro de ligação ao servidor.");
-          console.error(err);
+      try {
+        // Registo real no backend
+        const data = await apiRequest<{ success: boolean; user?: any }>("/api/register-user", {
+          method: "POST",
+          body: JSON.stringify({ 
+            email: trimmedEmail, 
+            name: name.trim(), 
+            password, 
+            quizAnswers: selectedAnswers,
+            isRegistration: true
+          })
         });
+
+        setIsLoading(false);
+        if (data.success && data.user) {
+          onLoginSuccess(data.user.email, data.user.name, data.user.plan);
+        } else {
+          setError("Erro ao criar conta no servidor.");
+        }
+      } catch (err: any) {
+        setIsLoading(false);
+        if (err instanceof ApiError && (err.code === "ACCOUNT_EXISTS" || err.status === 409)) {
+          setError("Este endereço de e-mail já está registado. Alterne para 'Iniciar Sessão' para entrar com as suas credenciais.");
+        } else {
+          setError(err.message || "Erro de ligação ao servidor.");
+        }
+        console.error("Erro no registo de utilizador:", err);
+      }
     } else {
-      // Login real no backend com validação de palavra-passe e autorregisto suave
-      fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, password })
-      })
-        .then(async res => {
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            // Se por algum motivo indicar que o utilizador não existe, efetua o registo automático
-            if (data.error && data.error.toLowerCase().includes("não encontrado")) {
-              const regRes = await fetch("/api/register-user", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  email: trimmedEmail,
-                  name: trimmedEmail.split("@")[0],
-                  password,
-                  quizAnswers: selectedAnswers
-                })
-              });
-              const regData = await regRes.json();
-              if (regRes.ok && regData.success && regData.user) {
-                return regData;
-              }
-            }
-            throw new Error(data.error || "Palavra-passe errada. Tente novamente.");
-          }
-          return data;
-        })
-        .then(data => {
-          setIsLoading(false);
-          if (data.success && data.user) {
-            onLoginSuccess(data.user.email, data.user.name, data.user.plan);
-          } else {
-            setError(data.error || "Palavra-passe errada. Tente novamente.");
-          }
-        })
-        .catch(err => {
-          setIsLoading(false);
-          setError(err.message || "Erro de ligação ao servidor.");
-          console.error(err);
+      // Login real no backend com validação de palavra-passe
+      try {
+        const data = await apiRequest<{ success: boolean; user?: any }>("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ email: trimmedEmail, password })
         });
+
+        setIsLoading(false);
+        if (data.success && data.user) {
+          onLoginSuccess(data.user.email, data.user.name, data.user.plan);
+        } else {
+          setError("Credenciais inválidas. Tente novamente.");
+        }
+      } catch (err: any) {
+        setIsLoading(false);
+        setError(err.message || "Erro de ligação ao servidor.");
+        console.error("Erro no início de sessão:", err);
+      }
     }
   };
 
@@ -334,6 +326,28 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   return (
     <div id="login-container" className="min-h-screen bg-[#050507] text-slate-100 flex items-center justify-center relative overflow-hidden font-sans">
       
+      {/* Top right theme toggle for visitors & users */}
+      <div className="fixed top-5 right-5 z-50">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="flex items-center gap-2 py-2 px-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white text-xs font-semibold backdrop-blur-md shadow-2xl transition-all cursor-pointer hover:scale-105 active:scale-95"
+          title={theme === "dark" ? "Mudar para Tema Claro" : "Mudar para Tema Escuro"}
+        >
+          {theme === "dark" ? (
+            <>
+              <Sun className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">Tema Claro</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-4 h-4 text-indigo-500" />
+              <span className="hidden sm:inline">Tema Escuro</span>
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Absolute Ambient Glows */}
       <div className="absolute top-[-15%] left-[-15%] w-[60%] h-[60%] bg-[#FF3B30]/8 rounded-full blur-[140px] pointer-events-none animate-pulse" />
       <div className="absolute bottom-[-15%] right-[-15%] w-[60%] h-[60%] bg-[#06B6D4]/5 rounded-full blur-[160px] pointer-events-none" />
@@ -351,12 +365,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           {/* Logo & Brand Header */}
           <div className="relative z-10 space-y-2">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#9E1B1B] to-[#FF3B30] flex items-center justify-center text-white shadow-lg shadow-[#FF3B30]/25">
-                <Heart className="w-6 h-6 fill-white/10 text-white animate-pulse" />
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#9E1B1B] to-[#FF3B30] flex items-center justify-center text-white shadow-[0_0_25px_rgba(255,59,48,0.55)] animate-futuristic-float cursor-pointer">
+                <Heart className="w-6 h-6 fill-white/20 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-black tracking-tight font-display text-white">
-                  Amor <span className="text-[#FF3B30]">IA</span>
+                  Amor <span className="text-[#FF3B30] neon-text-red">IA</span>
                 </h1>
                 <span className="text-[10px] font-mono font-bold tracking-wider text-slate-400 uppercase flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-[#06B6D4] animate-ping shrink-0" />
