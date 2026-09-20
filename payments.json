@@ -93,5 +93,24 @@
     "auditLogs": [
       "[2026-09-20T16:30:14.241Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
     ]
+  },
+  {
+    "paymentId": "PAY-SMD4BQ6F9",
+    "transactionId": "TX-OWSNNF",
+    "email": "novoteste@gmail.com",
+    "name": "Novo Utilizador",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "20/09/2026",
+    "time": "17:00:46",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-20T17:00:46.931Z",
+    "updatedAt": "2026-09-20T17:00:46.931Z",
+    "auditLogs": [
+      "[2026-09-20T17:00:46.931Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
   }
 ]

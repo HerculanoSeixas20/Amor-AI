@@ -33,5 +33,12 @@
     "event": "Comprovativo enviado automaticamente por interação do utilizador",
     "user": "teste_amor_ia@exemplo.com",
     "timestamp": "2026-09-20T16:30:14.253Z"
+  },
+  {
+    "id": "H-RC59WDGGZ",
+    "paymentId": "PAY-SMD4BQ6F9",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "novoteste@gmail.com",
+    "timestamp": "2026-09-20T17:00:46.933Z"
   }
 ]

@@ -1,12 +1,12 @@
 [
   {
     "email": "chillplaces9@gmail.com",
-    "name": "Desenvolvedor",
+    "name": "Mário",
     "plan": "Premium",
-    "password": "123",
-    "updatedAt": "2026-07-21T14:14:30.328Z",
-    "lastLogin": "2026-07-21T14:14:30.328Z",
-    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "password": "admin",
+    "updatedAt": "2026-09-20T17:02:35.407Z",
+    "lastLogin": "2026-09-20T17:02:35.407Z",
+    "avatar": "https://lh3.googleusercontent.com/a/default",
     "provider": "Google",
     "country": "Angola",
     "language": "Português",
@@ -14,7 +14,11 @@
     "sessions": [
       "2026-07-21T10:03:09.402Z",
       "2026-07-21T14:14:30.077Z",
-      "2026-07-21T14:14:30.328Z"
+      "2026-07-21T14:14:30.328Z",
+      "2026-09-20T16:58:53.098Z",
+      "2026-09-20T17:00:50.754Z",
+      "2026-09-20T17:02:35.388Z",
+      "2026-09-20T17:02:35.407Z"
     ]
   },
   {
@@ -140,6 +144,23 @@
     "provider": "Google",
     "createdAt": "2026-09-20T16:23:58.196Z",
     "lastLogin": "2026-09-20T16:23:58.196Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA"
+  },
+  {
+    "email": "novoteste@gmail.com",
+    "name": "Novo Utilizador",
+    "plan": "Free",
+    "password": "senhaSegura123",
+    "sessions": [
+      "2026-09-20T17:00:46.931Z"
+    ],
+    "updatedAt": "2026-09-20T17:00:46.931Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Email",
+    "createdAt": "2026-09-20T17:00:46.931Z",
+    "lastLogin": "2026-09-20T17:00:46.931Z",
     "country": "Angola",
     "language": "Português",
     "currency": "AOA"

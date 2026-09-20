@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Utilizador registado na plataforma Amor IA",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Endereço de e-mail do utilizador",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Nome do utilizador",
+          "maxLength": 100
+        },
+        "plan": {
+          "type": "string",
+          "enum": ["Free", "Premium"],
+          "description": "Nível de subscrição"
+        },
+        "avatar": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "URL do avatar do utilizador"
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Provedor de autenticação (Google, Email)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Data de criação"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "Data do último login"
+        }
+      },
+      "required": ["email", "name", "plan"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfis de utilizador do Amor IA"
+    }
+  }
+}

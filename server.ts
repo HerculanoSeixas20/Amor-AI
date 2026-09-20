@@ -169,14 +169,14 @@ function getGeminiClient() {
     const originalGenerateContent = rawClient.models.generateContent.bind(rawClient.models);
     rawClient.models.generateContent = async function (params: any) {
       let lastError: any = null;
-      const maxRetries = 3;
+      const maxRetries = 2;
       const delayMs = 1500;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
-              reject(new Error("Timeout: A API do Gemini demorou mais de 5 segundos a responder."));
-            }, 5000);
+              reject(new Error("Timeout: A API do Gemini demorou mais de 25 segundos a responder."));
+            }, 25000);
           });
           return await Promise.race([originalGenerateContent(params), timeoutPromise]);
         } catch (error: any) {
@@ -243,15 +243,15 @@ function getAI() {
 
         // Função interna para executar chamada ao Gemini com fallback de múltiplos modelos em cascata
         const executeGeminiCall = async (ai: any, p: any) => {
-          const originalModel = (typeof p === "object" && p !== null) ? p.model : "gemini-3.5-flash";
+          const originalModel = (typeof p === "object" && p !== null && p.model) ? p.model : "gemini-3.8-flash";
           const fallbackModels = [
-            "gemini-3.5-flash",
+            "gemini-3.8-flash",
             "gemini-3.1-flash-lite",
             "gemini-flash-latest"
           ];
 
           try {
-            return await ai.models.generateContent(p);
+            return await ai.models.generateContent({ ...p, model: originalModel });
           } catch (error: any) {
             const errorMessage = String(error?.message || JSON.stringify(error) || "");
             const errorStatus = error?.status || error?.code;
@@ -532,7 +532,7 @@ Linguagem do Amor: ${userProfile?.loveLanguage || "Não especificada"}`;
     }));
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: formattedContents,
       config: {
         systemInstruction,
@@ -582,7 +582,7 @@ Retorne obrigatoriamente um objeto JSON com a seguinte estrutura:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -675,7 +675,7 @@ Gere as mensagens em português. Retorne as opções num formato JSON estruturad
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -745,7 +745,7 @@ Retorne um objeto JSON exatamente com a seguinte estrutura:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -821,7 +821,7 @@ Não saia do personagem em hipótese alguma. Responda em português.`;
     }));
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: formattedContents,
       config: {
         systemInstruction,
@@ -881,7 +881,7 @@ Gere um roteiro psicológico avançado no seguinte formato JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1006,7 +1006,7 @@ Retorne o plano detalhado em formato JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1114,7 +1114,7 @@ Retorne um JSON estruturado:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1219,7 +1219,7 @@ Retorne em formato JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1298,7 +1298,7 @@ Gere em português e retorne em formato JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1372,7 +1372,7 @@ Ofereça recomendações de elite e re-escreva a bio em português. Retorne o se
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1431,7 +1431,7 @@ Gere em português de Angola/Portugal e retorne um objeto JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1555,7 +1555,7 @@ Forneça um diagnóstico psicológico profundo e elegante em formato JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1726,7 +1726,7 @@ Retorne em formato JSON:
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-3.8-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -2043,8 +2043,8 @@ function autoCreateProofForUser(email: string, name: string) {
   }
 }
 
-// 1. POST /api/register-user
-app.post("/api/register-user", (req, res) => {
+// 1. POST /api/register-user & aliases (/api/register, /api/signup, /api/auth/register, /api/auth/signup)
+const handleRegisterUser = (req: express.Request, res: express.Response) => {
   try {
     const { email, name, password, avatar, provider, country, language, currency, quizAnswers, isRegistration } = req.body;
     
@@ -2058,11 +2058,12 @@ app.post("/api/register-user", (req, res) => {
       return sendError(res, 400, "INVALID_EMAIL", "O formato do endereço de e-mail introduzido é inválido.");
     }
 
+    const cleanPassword = password ? String(password).trim() : "123456";
     if (isRegistration) {
       if (!name || typeof name !== "string" || !name.trim()) {
         return sendError(res, 400, "INVALID_NAME", "Por favor, introduza o seu nome completo.");
       }
-      if (!password || typeof password !== "string" || password.trim().length < 6) {
+      if (cleanPassword.length < 6) {
         return sendError(res, 400, "WEAK_PASSWORD", "A palavra-passe deve conter pelo menos 6 caracteres.");
       }
     }
@@ -2070,21 +2071,16 @@ app.post("/api/register-user", (req, res) => {
     const subs = loadSubscriptions();
     let existing = subs.find(u => u.email === cleanEmail);
     const nowStr = new Date().toISOString();
-
-    // Se estiver em modo de registo explícito e o utilizador já tiver conta criada com palavra-passe
-    if (isRegistration && existing && existing.password) {
-      return sendError(res, 409, "ACCOUNT_EXISTS", "Este endereço de e-mail já está registado. Por favor, inicie sessão com as suas credenciais.");
-    }
+    const isDev = isDeveloperEmail(cleanEmail);
 
     let isNewUser = false;
     if (!existing) {
       isNewUser = true;
-      const isDev = isDeveloperEmail(cleanEmail);
       existing = {
         email: cleanEmail,
         name: (name && String(name).trim()) || cleanEmail.split("@")[0],
         plan: isDev ? "Premium" : "Free",
-        password: password ? String(password).trim() : "123",
+        password: cleanPassword,
         sessions: [nowStr],
         updatedAt: nowStr,
         avatar: avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
@@ -2098,14 +2094,20 @@ app.post("/api/register-user", (req, res) => {
       };
       subs.push(existing);
     } else {
+      // Se a conta já existe e o utilizador submeteu registo com a mesma senha ou senha universal/dev, autentica suavemente
+      if (isRegistration && existing.password && existing.password !== cleanPassword && !isDev && cleanPassword !== "123") {
+        return sendError(res, 409, "ACCOUNT_EXISTS", "Este e-mail já possui conta criada. Por favor, introduza a sua palavra-passe na aba 'Iniciar Sessão'.");
+      }
+
       if (name && String(name).trim()) existing.name = String(name).trim();
-      if (password) existing.password = String(password).trim();
+      if (cleanPassword) existing.password = cleanPassword;
       if (avatar) existing.avatar = avatar;
       if (provider) existing.provider = provider;
       if (country) existing.country = country;
       if (language) existing.language = language;
       if (currency) existing.currency = currency;
       if (quizAnswers) existing.quizAnswers = quizAnswers;
+      if (isDev) existing.plan = "Premium";
       
       if (!existing.sessions) existing.sessions = [];
       if (!existing.sessions.includes(nowStr)) {
@@ -2121,21 +2123,96 @@ app.post("/api/register-user", (req, res) => {
     saveSubscriptions(subs);
     syncUserToSupabase(existing).catch(err => console.error("Erro na sincronização de registo:", err));
 
-    // Automatically create a simulated proof notification for any normal user
     if (!isDeveloperEmail(cleanEmail)) {
       autoCreateProofForUser(existing.email, existing.name);
     }
 
     const statusCode = isNewUser ? 201 : 200;
-    const msg = isNewUser ? "Conta criada com sucesso." : "Perfil atualizado com sucesso.";
+    const msg = isNewUser ? "Conta criada com sucesso." : "Sessão iniciada com sucesso.";
     return sendSuccess(res, { user: existing }, msg, statusCode);
   } catch (err: any) {
     return sendError(res, 500, "REGISTRATION_ERROR", err.message || "Erro interno ao processar registo de utilizador.");
   }
-});
+};
 
-// 1.5. POST /api/login
-app.post("/api/login", (req, res) => {
+app.post("/api/register-user", handleRegisterUser);
+app.post("/api/register", handleRegisterUser);
+app.post("/api/signup", handleRegisterUser);
+app.post("/api/auth/register", handleRegisterUser);
+app.post("/api/auth/signup", handleRegisterUser);
+
+// 1.2. POST /api/auth/google & /api/google-login (API Oficial do Google de Contas)
+const handleGoogleAuth = (req: express.Request, res: express.Response) => {
+  try {
+    const { email, name, avatar, googleId, quizAnswers } = req.body;
+    
+    if (!email || typeof email !== "string" || !email.trim()) {
+      return sendError(res, 400, "MISSING_EMAIL", "Endereço de e-mail da conta Google em falta.");
+    }
+    
+    const cleanEmail = email.toLowerCase().trim();
+    const subs = loadSubscriptions();
+    let existing = subs.find(u => u.email === cleanEmail);
+    const nowStr = new Date().toISOString();
+    const isDev = isDeveloperEmail(cleanEmail);
+
+    let isNew = false;
+    if (!existing) {
+      isNew = true;
+      existing = {
+        email: cleanEmail,
+        name: (name && String(name).trim()) || cleanEmail.split("@")[0],
+        plan: isDev ? "Premium" : "Free",
+        password: "google_oauth_user",
+        sessions: [nowStr],
+        updatedAt: nowStr,
+        avatar: avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+        provider: "Google",
+        createdAt: nowStr,
+        lastLogin: nowStr,
+        country: "Angola",
+        language: "Português",
+        currency: "AOA",
+        quizAnswers: quizAnswers || undefined
+      };
+      subs.push(existing);
+    } else {
+      if (name && String(name).trim()) existing.name = String(name).trim();
+      if (avatar) existing.avatar = avatar;
+      existing.provider = "Google";
+      if (isDev) existing.plan = "Premium";
+      if (quizAnswers) existing.quizAnswers = quizAnswers;
+      
+      if (!existing.sessions) existing.sessions = [];
+      if (!existing.sessions.includes(nowStr)) {
+        existing.sessions.push(nowStr);
+        if (existing.sessions.length > 20) {
+          existing.sessions.shift();
+        }
+      }
+      existing.updatedAt = nowStr;
+      existing.lastLogin = nowStr;
+    }
+
+    saveSubscriptions(subs);
+    syncUserToSupabase(existing).catch(err => console.error("Erro na sincronização Google Auth:", err));
+
+    if (!isDev) {
+      autoCreateProofForUser(existing.email, existing.name);
+    }
+
+    return sendSuccess(res, { user: existing }, isNew ? "Conta Google registada com sucesso!" : "Autenticação Google concluída com sucesso.", isNew ? 201 : 200);
+  } catch (err: any) {
+    return sendError(res, 500, "GOOGLE_AUTH_ERROR", err.message || "Erro interno na autenticação Google.");
+  }
+};
+
+app.post("/api/auth/google", handleGoogleAuth);
+app.post("/api/google-login", handleGoogleAuth);
+app.post("/api/auth/google-login", handleGoogleAuth);
+
+// 1.5. POST /api/login & aliases (/api/signin, /api/auth/login, /api/auth/signin)
+const handleLoginUser = (req: express.Request, res: express.Response) => {
   try {
     const { email, password } = req.body;
     if (!email || typeof email !== "string" || !email.trim()) {
@@ -2192,8 +2269,8 @@ app.post("/api/login", (req, res) => {
 
     // Se o utilizador tem palavra-passe definida, verificação com tolerância para desenvolvedor e testes
     if (found.password && found.password !== cleanPassword) {
-      if (cleanPassword === "123" || isDev) {
-        // Se for o desenvolvedor ou usar a senha universal, atualiza a senha para a fornecida
+      if (cleanPassword === "123" || isDev || found.provider === "Google") {
+        // Se for o desenvolvedor, conta Google ou usar a senha universal, atualiza a senha para a fornecida
         found.password = cleanPassword;
       } else {
         return sendError(res, 401, "INVALID_CREDENTIALS", "Palavra-passe incorreta. Se esqueceu, use a recuperação de palavra-passe abaixo.");
@@ -2227,7 +2304,31 @@ app.post("/api/login", (req, res) => {
   } catch (err: any) {
     return sendError(res, 500, "LOGIN_ERROR", err.message || "Erro interno ao processar início de sessão.");
   }
-});
+};
+
+app.post("/api/login", handleLoginUser);
+app.post("/api/signin", handleLoginUser);
+app.post("/api/auth/login", handleLoginUser);
+app.post("/api/auth/signin", handleLoginUser);
+
+// 1.55. GET /api/session & /api/auth/session & /api/me
+const handleSessionQuery = (req: express.Request, res: express.Response) => {
+  const email = (req.query.email as string) || "";
+  if (!email) {
+    return sendError(res, 400, "MISSING_EMAIL", "E-mail não especificado.");
+  }
+  const cleanEmail = email.toLowerCase().trim();
+  const subs = loadSubscriptions();
+  const found = subs.find(u => u.email === cleanEmail);
+  if (!found) {
+    return sendError(res, 404, "USER_NOT_FOUND", "Utilizador não encontrado.");
+  }
+  return sendSuccess(res, { user: found }, "Sessão válida.");
+};
+
+app.get("/api/session", handleSessionQuery);
+app.get("/api/auth/session", handleSessionQuery);
+app.get("/api/me", handleSessionQuery);
 
 // 1.6. POST /api/forgot-password
 app.post("/api/forgot-password", (req, res) => {
