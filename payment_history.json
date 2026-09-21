@@ -40,5 +40,12 @@
     "event": "Comprovativo enviado automaticamente por interação do utilizador",
     "user": "novoteste@gmail.com",
     "timestamp": "2026-09-20T17:00:46.933Z"
+  },
+  {
+    "id": "H-VE6IYKQ7B",
+    "paymentId": "PAY-HWIAM4TXE",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "teste.producao@amoria.com",
+    "timestamp": "2026-09-20T17:29:13.311Z"
   }
 ]

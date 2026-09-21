@@ -112,5 +112,24 @@
     "auditLogs": [
       "[2026-09-20T17:00:46.931Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
     ]
+  },
+  {
+    "paymentId": "PAY-HWIAM4TXE",
+    "transactionId": "TX-34OIJ5",
+    "email": "teste.producao@amoria.com",
+    "name": "Teste Producao",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "5.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "20/09/2026",
+    "time": "17:29:13",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-20T17:29:13.299Z",
+    "updatedAt": "2026-09-20T17:29:13.299Z",
+    "auditLogs": [
+      "[2026-09-20T17:29:13.299Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
   }
 ]

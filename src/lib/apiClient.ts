@@ -65,14 +65,27 @@ export async function apiRequest<T = any>(
   const requestId = headers.get("X-Request-ID") || generateRequestId();
   headers.set("X-Request-ID", requestId);
 
-  let response: Response;
-  try {
-    response = await fetch(endpoint, {
-      ...options,
-      headers
-    });
-  } catch (networkError: any) {
-    console.error(`[API Network Error] Falha de ligação ao endpoint ${endpoint} (ReqID: ${requestId}):`, networkError);
+  let response: Response | null = null;
+  let lastNetworkError: any = null;
+  const maxAttempts = 3;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      response = await fetch(endpoint, {
+        ...options,
+        headers
+      });
+      break;
+    } catch (networkError: any) {
+      lastNetworkError = networkError;
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 350 * attempt));
+      }
+    }
+  }
+
+  if (!response) {
+    console.warn(`[API Network Warning] Falha de ligação ao endpoint ${endpoint} (ReqID: ${requestId}):`, lastNetworkError?.message || lastNetworkError);
     throw new ApiError(
       "Não foi possível conectar ao servidor. Por favor, verifique a sua ligação à internet.",
       "NETWORK_ERROR",
@@ -88,7 +101,7 @@ export async function apiRequest<T = any>(
   if (!contentType.includes("application/json")) {
     const rawText = await response.text().catch(() => "");
     const preview = rawText.substring(0, 150).trim();
-    console.error(`[API Non-JSON Response] ${endpoint} Status: ${response.status} (ReqID: ${responseReqId}):`, preview);
+    console.warn(`[API Non-JSON Response] ${endpoint} Status: ${response.status} (ReqID: ${responseReqId}):`, preview);
 
     let friendlyMessage = "O servidor devolveu uma resposta inesperada. Tente novamente em instantes.";
 

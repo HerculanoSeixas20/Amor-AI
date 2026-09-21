@@ -3,7 +3,6 @@ import path from "path";
 import dotenv from "dotenv";
 import crypto from "crypto";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import { OpenAI } from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { AsyncLocalStorage } from "async_hooks";
@@ -13,6 +12,17 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Middleware de CORS e preflight OPTIONS para compatibilidade com Vercel e produção
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, x-ai-provider, x-user-email");
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
 
 // Middleware de Request ID único (X-Request-ID) para rastreabilidade ponta a ponta
 app.use((req, res, next) => {
@@ -94,18 +104,24 @@ function getOpenAI() {
   return openaiClient;
 }
 
-// Inicialização Preguiçosa (Lazy) do Cliente do Supabase
+// Inicialização Preguiçosa (Lazy) do Cliente do Supabase com suporte a variáveis Vercel / Next.js
 let supabaseClient: any = null;
 function getSupabase() {
   if (!supabaseClient) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !key) {
       throw new Error("As credenciais do Supabase (SUPABASE_URL e SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY) não estão configuradas nas variáveis de ambiente.");
     }
     supabaseClient = createClient(url, key);
   }
   return supabaseClient;
+}
+
+function isSupabaseConfigured(): boolean {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return Boolean(url && key);
 }
 
 // Adaptador Proxy do OpenAI que emula a assinatura do SDK do Gemini (ai.models.generateContent)
@@ -1760,11 +1776,55 @@ Retorne em formato JSON:
 
 import fs from "fs";
 
-const SUBSCRIPTIONS_FILE = path.join(process.cwd(), "subscriptions.json");
-const PAYMENTS_FILE = path.join(process.cwd(), "payments.json");
-const RECEIPTS_FILE = path.join(process.cwd(), "payment_receipts.json");
-const HISTORY_FILE = path.join(process.cwd(), "payment_history.json");
-const NOTIFICATIONS_FILE = path.join(process.cwd(), "notifications.json");
+// Resiliência de Armazenamento para Ambientes Serverless (Vercel / AWS Lambda)
+const isVercelRuntime = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+function getStoragePath(filename: string): string {
+  if (isVercelRuntime) {
+    const tmpPath = path.join("/tmp", filename);
+    if (!fs.existsSync(tmpPath)) {
+      const srcPath = path.join(process.cwd(), filename);
+      if (fs.existsSync(srcPath)) {
+        try {
+          fs.copyFileSync(srcPath, tmpPath);
+        } catch {
+          // ignora falha de cópia
+        }
+      }
+    }
+    return tmpPath;
+  }
+  return path.join(process.cwd(), filename);
+}
+
+function safeWriteJson(targetPath: string, data: any) {
+  try {
+    fs.writeFileSync(targetPath, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err: any) {
+    if (err?.code === "EROFS" || err?.message?.includes("read-only")) {
+      try {
+        const tmpPath = path.join("/tmp", path.basename(targetPath));
+        fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf-8");
+      } catch (innerErr) {
+        console.warn(`[SafeWrite] Aviso de gravação em /tmp:`, innerErr);
+      }
+    } else {
+      console.warn(`[SafeWrite] Aviso de gravação em ${targetPath}:`, err?.message);
+    }
+  }
+}
+
+const SUBSCRIPTIONS_FILE = getStoragePath("subscriptions.json");
+const PAYMENTS_FILE = getStoragePath("payments.json");
+const RECEIPTS_FILE = getStoragePath("payment_receipts.json");
+const HISTORY_FILE = getStoragePath("payment_history.json");
+const NOTIFICATIONS_FILE = getStoragePath("notifications.json");
+
+// Memória persistente entre invocações na mesma instância Serverless
+let memorySubs: SavedUser[] | null = null;
+let memoryPayments: Payment[] | null = null;
+let memoryHistory: any[] | null = null;
+let memoryNotifications: NotificationItem[] | null = null;
 
 interface NotificationItem {
   id: string;
@@ -1776,22 +1836,24 @@ interface NotificationItem {
 }
 
 function loadNotifications(): NotificationItem[] {
+  if (memoryNotifications && memoryNotifications.length > 0) {
+    return memoryNotifications;
+  }
   try {
-    if (fs.existsSync(NOTIFICATIONS_FILE)) {
-      return JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, "utf-8"));
+    const file = getStoragePath("notifications.json");
+    if (fs.existsSync(file)) {
+      memoryNotifications = JSON.parse(fs.readFileSync(file, "utf-8"));
+      return memoryNotifications!;
     }
   } catch (e) {
     console.error("Erro ao ler notificacoes.json:", e);
   }
-  return [];
+  return memoryNotifications || [];
 }
 
 function saveNotifications(notifications: NotificationItem[]) {
-  try {
-    fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notifications, null, 2), "utf-8");
-  } catch (e) {
-    console.error("Erro ao gravar notificacoes.json:", e);
-  }
+  memoryNotifications = [...notifications];
+  safeWriteJson(getStoragePath("notifications.json"), notifications);
 }
 
 function sendNotification(email: string, title: string, message: string) {
@@ -1912,21 +1974,37 @@ function isDeveloperEmail(email?: string | null): boolean {
 }
 
 function loadSubscriptions(): SavedUser[] {
+  if (memorySubs && memorySubs.length > 0) {
+    return memorySubs;
+  }
   try {
     let subs: SavedUser[] = [];
-    if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
-      const data = fs.readFileSync(SUBSCRIPTIONS_FILE, "utf-8");
+    const targetFile = getStoragePath("subscriptions.json");
+    if (fs.existsSync(targetFile)) {
+      const data = fs.readFileSync(targetFile, "utf-8");
       subs = JSON.parse(data);
     } else {
-      const defaults: SavedUser[] = [
-        { email: "chillplaces9@gmail.com", name: "Desenvolvedor", plan: "Premium", password: "admin", updatedAt: new Date().toISOString() },
-        { email: "cliente@amoria.com", name: "António (Cliente)", plan: "Free", password: "123", updatedAt: new Date().toISOString() },
-        { email: "mateus.m@gmail.com", name: "Mateus Manuel", plan: "Premium", password: "123", updatedAt: new Date().toISOString() },
-        { email: "joanap@gmail.com", name: "Joana Pereira", plan: "Free", password: "123", updatedAt: new Date().toISOString() },
-        { email: "anacustodio@netcabo.ao", name: "Ana Custódio", plan: "Free", password: "123", updatedAt: new Date().toISOString() }
-      ];
-      fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(defaults, null, 2), "utf-8");
-      return defaults;
+      const cwdFile = path.join(process.cwd(), "subscriptions.json");
+      if (fs.existsSync(cwdFile)) {
+        try {
+          const data = fs.readFileSync(cwdFile, "utf-8");
+          subs = JSON.parse(data);
+        } catch {
+          // ignore
+        }
+      }
+      if (!subs || subs.length === 0) {
+        const defaults: SavedUser[] = [
+          { email: "chillplaces9@gmail.com", name: "Desenvolvedor", plan: "Premium", password: "admin", updatedAt: new Date().toISOString() },
+          { email: "cliente@amoria.com", name: "António (Cliente)", plan: "Free", password: "123", updatedAt: new Date().toISOString() },
+          { email: "mateus.m@gmail.com", name: "Mateus Manuel", plan: "Premium", password: "123", updatedAt: new Date().toISOString() },
+          { email: "joanap@gmail.com", name: "Joana Pereira", plan: "Free", password: "123", updatedAt: new Date().toISOString() },
+          { email: "anacustodio@netcabo.ao", name: "Ana Custódio", plan: "Free", password: "123", updatedAt: new Date().toISOString() }
+        ];
+        safeWriteJson(targetFile, defaults);
+        memorySubs = defaults;
+        return defaults;
+      }
     }
 
     // Certificar que todos os utilizadores existentes têm palavra-passe definida.
@@ -1938,52 +2016,63 @@ function loadSubscriptions(): SavedUser[] {
       }
     });
     if (changed) {
-      fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2), "utf-8");
+      safeWriteJson(targetFile, subs);
     }
+    memorySubs = subs;
     return subs;
   } catch (error) {
     console.error("Erro ao ler subscriptions.json:", error);
   }
-  return [];
+  if (!memorySubs) {
+    memorySubs = [
+      { email: "chillplaces9@gmail.com", name: "Desenvolvedor", plan: "Premium", password: "admin", updatedAt: new Date().toISOString() }
+    ];
+  }
+  return memorySubs;
 }
 
 function saveSubscriptions(subs: SavedUser[]) {
-  try {
-    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Erro ao gravar subscriptions.json:", error);
-  }
+  memorySubs = [...subs];
+  safeWriteJson(getStoragePath("subscriptions.json"), subs);
 }
 
 function loadPayments(): Payment[] {
+  if (memoryPayments && memoryPayments.length > 0) {
+    return memoryPayments;
+  }
   try {
-    if (fs.existsSync(PAYMENTS_FILE)) {
-      const data = fs.readFileSync(PAYMENTS_FILE, "utf-8");
-      return JSON.parse(data);
+    const targetFile = getStoragePath("payments.json");
+    if (fs.existsSync(targetFile)) {
+      const data = fs.readFileSync(targetFile, "utf-8");
+      memoryPayments = JSON.parse(data);
+      return memoryPayments!;
     } else {
       const defaults: Payment[] = [];
-      fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(defaults, null, 2), "utf-8");
+      safeWriteJson(targetFile, defaults);
+      memoryPayments = defaults;
       return defaults;
     }
   } catch (error) {
     console.error("Erro ao ler payments.json:", error);
   }
-  return [];
+  return memoryPayments || [];
 }
 
 function savePayments(payments: Payment[]) {
-  try {
-    fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(payments, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Erro ao gravar payments.json:", error);
-  }
+  memoryPayments = [...payments];
+  safeWriteJson(getStoragePath("payments.json"), payments);
 }
 
 function appendHistory(paymentId: string, event: string, email: string) {
   try {
     let history = [];
-    if (fs.existsSync(HISTORY_FILE)) {
-      history = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf-8"));
+    const targetFile = getStoragePath("payment_history.json");
+    if (fs.existsSync(targetFile)) {
+      try {
+        history = JSON.parse(fs.readFileSync(targetFile, "utf-8"));
+      } catch {}
+    } else if (memoryHistory) {
+      history = memoryHistory;
     }
     history.push({
       id: "H-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
@@ -1992,7 +2081,8 @@ function appendHistory(paymentId: string, event: string, email: string) {
       user: email,
       timestamp: new Date().toISOString()
     });
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), "utf-8");
+    memoryHistory = history;
+    safeWriteJson(targetFile, history);
   } catch (e) {
     console.error("Erro ao gravar no histórico de pagamentos:", e);
   }
@@ -2745,10 +2835,14 @@ app.post("/api/payment/upload-receipt", (req, res) => {
       payments.push(payment);
     }
 
-    // Criar diretório uploads se não existir
-    const uploadsDir = path.join(process.cwd(), "uploads");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    // Criar diretório uploads se não existir (utiliza /tmp em ambientes Serverless)
+    const uploadsDir = isVercelRuntime ? path.join("/tmp", "uploads") : path.join(process.cwd(), "uploads");
+    try {
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+    } catch (mkdirErr) {
+      console.warn("Aviso ao criar diretório uploads:", mkdirErr);
     }
 
     // Processar base64
@@ -2774,8 +2868,12 @@ app.post("/api/payment/upload-receipt", (req, res) => {
     const filename = `${paymentId}_receipt.${fileExtension}`;
     const filepath = path.join(uploadsDir, filename);
 
-    // Gravar ficheiro físico no servidor
-    fs.writeFileSync(filepath, Buffer.from(base64Data, "base64"));
+    // Gravar ficheiro físico no servidor de forma segura
+    try {
+      fs.writeFileSync(filepath, Buffer.from(base64Data, "base64"));
+    } catch (writeErr) {
+      console.warn("Aviso ao gravar ficheiro físico do comprovativo:", writeErr);
+    }
     const receiptUrl = `/uploads/${filename}`;
 
     const now = new Date();
@@ -2788,7 +2886,7 @@ app.post("/api/payment/upload-receipt", (req, res) => {
 
     // Guardar no payment_receipts.json para histórico extra
     let receipts = [];
-    const receiptsFile = path.join(process.cwd(), "payment_receipts.json");
+    const receiptsFile = getStoragePath("payment_receipts.json");
     if (fs.existsSync(receiptsFile)) {
       try {
         receipts = JSON.parse(fs.readFileSync(receiptsFile, "utf-8"));
@@ -2800,7 +2898,7 @@ app.post("/api/payment/upload-receipt", (req, res) => {
       receiptUrl,
       uploadedAt: now.toISOString()
     });
-    fs.writeFileSync(receiptsFile, JSON.stringify(receipts, null, 2), "utf-8");
+    safeWriteJson(receiptsFile, receipts);
 
     appendHistory(paymentId, `Comprovativo de pagamento submetido`, payment.email);
 
@@ -3180,12 +3278,17 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   );
 });
 
+// Rota estática para servir uploads/comprovativos
+const uploadsDirToServe = isVercelRuntime ? path.join("/tmp", "uploads") : path.join(process.cwd(), "uploads");
+app.use("/uploads", express.static(uploadsDirToServe));
+
 // -------------------------------------------------------------
 // INTEGRAÇÃO DE MIDDLEWARE VITE E CONFIGURAÇÃO DE SERVIDOR
 // -------------------------------------------------------------
 
 async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -3204,7 +3307,13 @@ async function bootstrap() {
   });
 }
 
-bootstrap().catch((err) => {
-  console.error("Erro ao inicializar o servidor:", err);
-});
+// Iniciar servidor express apenas fora do ambiente serverless (na Vercel, o handler em /api gere as requisições)
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  bootstrap().catch((err) => {
+    console.error("Erro ao inicializar o servidor:", err);
+  });
+}
+
+export { app };
+export default app;
 

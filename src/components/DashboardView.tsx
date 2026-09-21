@@ -23,6 +23,8 @@ export default function DashboardView({ userProfile, onNavigateToModule }: Dashb
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (userProfile) {
       setLoading(true);
       fetch("/api/dashboard-insights", {
@@ -32,13 +34,25 @@ export default function DashboardView({ userProfile, onNavigateToModule }: Dashb
       })
         .then((res) => res.json())
         .then((data) => {
-          if (data && !data.error) {
-            setInsightData(data);
+          if (isMounted && data && !data.error && (data.recommendation || data.insight)) {
+            setInsightData((prev) => ({
+              recommendation: data.recommendation || prev.recommendation,
+              insight: data.insight || prev.insight,
+              mission: data.mission || prev.mission,
+            }));
           }
         })
-        .catch((err) => console.error("Erro ao carregar insights diários:", err))
-        .finally(() => setLoading(false));
+        .catch((err) => {
+          console.warn("Aviso ao carregar insights diários:", err);
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [userProfile]);
 
   // Safe checks for user details

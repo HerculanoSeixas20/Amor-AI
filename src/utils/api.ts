@@ -35,61 +35,79 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     }
   }
 
-  try {
-    const response = await window.fetch(input, {
-      ...init,
-      headers,
-    });
+  let attempt = 0;
+  const maxAttempts = 3;
 
-    // Blindagem de .json() para impedir "Unexpected token 'T', 'The page c...' is not valid JSON"
-    const originalJson = response.json.bind(response);
-    response.json = async () => {
-      const contentType = response.headers.get("content-type") || "";
-      if (!contentType.includes("application/json")) {
-        const text = await response.text().catch(() => "");
-        const preview = text.substring(0, 100);
-        console.error(`[apiFetch non-JSON response] ${url} Status: ${response.status}:`, preview);
+  while (attempt < maxAttempts) {
+    attempt++;
+    try {
+      const response = await window.fetch(input, {
+        ...init,
+        headers,
+      });
 
-        let friendlyMsg = "O servidor devolveu uma resposta inesperada. Por favor, tente novamente.";
-        if (response.status === 404) {
-          friendlyMsg = "Endpoint de serviço não encontrado (404).";
-        } else if (response.status >= 500) {
-          friendlyMsg = "Serviço temporariamente indisponível. A restabelecer ligação...";
+      // Blindagem de .json() para impedir "Unexpected token 'T', 'The page c...' is not valid JSON"
+      const originalJson = response.json.bind(response);
+      response.json = async () => {
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          const text = await response.text().catch(() => "");
+          const preview = text.substring(0, 100);
+          console.warn(`[apiFetch non-JSON response] ${url} Status: ${response.status}:`, preview);
+
+          let friendlyMsg = "O servidor devolveu uma resposta inesperada. Por favor, tente novamente.";
+          if (response.status === 404) {
+            friendlyMsg = "Endpoint de serviço não encontrado (404).";
+          } else if (response.status >= 500) {
+            friendlyMsg = "Serviço temporariamente indisponível. A restabelecer ligação...";
+          }
+
+          return {
+            success: false,
+            error: friendlyMsg,
+            rawPreview: preview,
+            status: response.status
+          };
         }
 
-        return {
-          success: false,
-          error: friendlyMsg,
-          rawPreview: preview,
-          status: response.status
-        };
+        try {
+          return await originalJson();
+        } catch (jsonErr) {
+          console.warn(`[apiFetch JSON parse error] ${url}:`, jsonErr);
+          return {
+            success: false,
+            error: "Dados recebidos em formato não reconhecido. Tente novamente.",
+            status: response.status
+          };
+        }
+      };
+
+      return response;
+    } catch (netErr: any) {
+      if (attempt < maxAttempts) {
+        // Aguardar breve intervalo antes de tentar novamente (contingência para reinício de servidor)
+        await new Promise((resolve) => setTimeout(resolve, 350 * attempt));
+        continue;
       }
 
-      try {
-        return await originalJson();
-      } catch (jsonErr) {
-        console.error(`[apiFetch JSON parse error] ${url}:`, jsonErr);
-        return {
+      console.warn(`[apiFetch network failure] ${url}:`, netErr?.message || netErr);
+      // Retornar um objeto Response emulado para evitar crash instantâneo
+      return new Response(
+        JSON.stringify({
           success: false,
-          error: "Dados recebidos em formato não reconhecido. Tente novamente.",
-          status: response.status
-        };
-      }
-    };
-
-    return response;
-  } catch (netErr: any) {
-    console.error(`[apiFetch network failure] ${url}:`, netErr);
-    // Retornar um objeto Response emulado para evitar crash instantâneo
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Falha de ligação ao servidor. Verifique a sua ligação à internet."
-      }),
-      {
-        status: 503,
-        headers: { "Content-Type": "application/json" }
-      }
-    );
+          error: "Falha de ligação ao servidor. A sincronizar dados..."
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
   }
+
+  // Fallback de segurança se sair do loop
+  return new Response(
+    JSON.stringify({ success: false, error: "Serviço temporariamente inacessível." }),
+    { status: 503, headers: { "Content-Type": "application/json" } }
+  );
 }

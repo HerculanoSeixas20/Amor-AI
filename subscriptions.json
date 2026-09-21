@@ -164,5 +164,23 @@
     "country": "Angola",
     "language": "Português",
     "currency": "AOA"
+  },
+  {
+    "email": "teste.producao@amoria.com",
+    "name": "Teste Producao",
+    "plan": "Free",
+    "password": "password123",
+    "sessions": [
+      "2026-09-20T17:29:13.298Z",
+      "2026-09-20T17:29:17.799Z"
+    ],
+    "updatedAt": "2026-09-20T17:29:17.799Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Email",
+    "createdAt": "2026-09-20T17:29:13.298Z",
+    "lastLogin": "2026-09-20T17:29:17.799Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA"
   }
 ]
