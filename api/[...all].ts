@@ -8,13 +8,35 @@ import app from "../server";
  */
 export default function handler(req: IncomingMessage, res: ServerResponse) {
   const customReq = req as any;
-  const matchedPath = customReq.headers?.["x-matched-path"] || customReq.headers?.["x-invoke-path"];
-  if (matchedPath && typeof matchedPath === "string" && matchedPath.startsWith("/api")) {
-    customReq.url = matchedPath;
-  } else if (customReq.query && customReq.query.all) {
-    const all = Array.isArray(customReq.query.all) ? customReq.query.all.join("/") : customReq.query.all;
-    const queryString = customReq.url && customReq.url.includes("?") ? customReq.url.slice(customReq.url.indexOf("?")) : "";
-    customReq.url = `/api/${all}${queryString}`;
+
+  // 1. Extrair o URI original enviado pelo cliente
+  const forwardedUri = 
+    customReq.headers?.["x-forwarded-uri"] || 
+    customReq.headers?.["x-real-url"] || 
+    customReq.headers?.["x-original-url"];
+
+  if (forwardedUri && typeof forwardedUri === "string" && forwardedUri.startsWith("/api")) {
+    customReq.url = forwardedUri;
+  } else if (customReq.query && (customReq.query.all || customReq.query.__path || customReq.query.path)) {
+    const rawPath = customReq.query.all || customReq.query.__path || customReq.query.path;
+    const pathStr = Array.isArray(rawPath) ? rawPath.join("/") : String(rawPath);
+    const cleanPath = pathStr.replace(/^\/+/, "");
+    
+    const urlParts = (customReq.url || "").split("?");
+    const existingQs = urlParts[1] ? `?${urlParts[1]}` : "";
+    customReq.url = `/api/${cleanPath}${existingQs}`;
+  } else {
+    let url = customReq.url || "/api";
+    if (!url.startsWith("/api")) {
+      url = `/api${url.startsWith("/") ? url : "/" + url}`;
+    }
+    customReq.url = url;
   }
+
+  // 2. Prevenir bloqueio de stream de corpo já consumido no runtime da Vercel
+  if (customReq.body !== undefined && !customReq._body) {
+    customReq._body = true;
+  }
+
   return app(customReq, res);
 }

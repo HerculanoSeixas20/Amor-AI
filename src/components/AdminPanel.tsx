@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Shield, Users, CreditCard, Coins, Key, Bell, ListTodo, 
   Activity, Gift, Terminal, Search, UserPlus, CheckCircle, XCircle, Sparkles, Loader2, RefreshCw, FileText,
-  Crown, Clock
+  Crown, Clock, Lock, Unlock, RotateCcw, Calendar, AlertTriangle, Check, AlertCircle, DollarSign
 } from "lucide-react";
 import { apiFetch as fetch } from "../utils/api";
 
@@ -10,6 +10,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<"users" | "payments" | "stats" | "coupons" | "logs">("payments");
   const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState<"all" | "trial_active" | "forced_payment" | "premium" | "trial_expired">("all");
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -55,6 +56,9 @@ export default function AdminPanel() {
     totalUsers: 0,
     premiumUsers: 0,
     freeUsers: 0,
+    trialActiveCount: 0,
+    forcedPaymentCount: 0,
+    trialExpiredCount: 0,
     totalRevenueKz: 0,
     formattedTotalRevenue: "0 Kzs",
     pendingPaymentsCount: 0,
@@ -216,6 +220,38 @@ export default function AdminPanel() {
     }
   };
 
+  // Ativação de cobrança forçada (encerra o teste de graça imediatamente para obrigar o usuário a pagar as assinaturas) ou reativação de 7 dias grátis
+  const handleForcePayment = async (email: string, forcePayment: boolean) => {
+    try {
+      const res = await fetch("/api/admin/force-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email, 
+          forcePayment, 
+          adminEmail: "chillplaces9@gmail.com" 
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage(
+          data.message || 
+          (forcePayment 
+            ? `Cobrança ativada para ${email}! O período de teste foi encerrado e o utilizador terá de assinar para aceder.` 
+            : `7 dias de teste grátis restaurados com sucesso para ${email}!`)
+        );
+        fetchUsers();
+        fetchStats();
+        setTimeout(() => setActionMessage(null), 5000);
+      } else {
+        alert("Erro ao alterar estatuto de cobrança: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro na ligação ao servidor.");
+    }
+  };
+
   const handleManualAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualEmail) return;
@@ -292,7 +328,15 @@ export default function AdminPanel() {
 
   const filteredUsers = users.filter(u => {
     const q = searchQuery.toLowerCase();
-    return (u.email || "").toLowerCase().includes(q) || (u.name || "").toLowerCase().includes(q);
+    const matchesQuery = (u.email || "").toLowerCase().includes(q) || (u.name || "").toLowerCase().includes(q);
+    if (!matchesQuery) return false;
+
+    if (userStatusFilter === "all") return true;
+    if (userStatusFilter === "premium") return u.plan === "Premium";
+    if (userStatusFilter === "forced_payment") return Boolean(u.trialTerminatedByAdmin || u.trialStatus === "forced_payment");
+    if (userStatusFilter === "trial_active") return u.plan !== "Premium" && !u.trialTerminatedByAdmin && (u.isTrialActive || u.trialStatus === "trial_active");
+    if (userStatusFilter === "trial_expired") return u.plan !== "Premium" && !u.trialTerminatedByAdmin && !u.isTrialActive;
+    return true;
   });
 
   return (
@@ -529,118 +573,314 @@ export default function AdminPanel() {
 
             {/* Right side: dynamic users list with toggle buttons */}
             <div className="lg:col-span-2 glass rounded-2xl border border-slate-900 overflow-hidden">
-              <div className="p-4 border-b border-slate-900 bg-slate-950/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white">Utilizadores Registados no Banco de Dados</h3>
-                  <button 
-                    onClick={fetchUsers} 
-                    className="p-1 hover:bg-slate-900 rounded-lg text-slate-500 hover:text-white transition-all"
-                    title="Recarregar"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
+              <div className="p-4 border-b border-slate-900 bg-slate-950/40 space-y-3">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Users className="w-4 h-4 text-[#FF3B30]" />
+                      Controlo de Utilizadores & Teste Gratuito
+                    </h3>
+                    <button 
+                      onClick={fetchUsers} 
+                      className="p-1 hover:bg-slate-900 rounded-lg text-slate-500 hover:text-white transition-all cursor-pointer"
+                      title="Recarregar Utilizadores"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="relative w-full sm:w-60">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar por nome ou e-mail..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-[#0A0A0F] border border-slate-900 rounded-xl py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-700 focus:outline-none focus:border-[#9E1B1B]"
+                    />
+                  </div>
                 </div>
-                <div className="relative w-full sm:w-60">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Pesquisar por nome ou e-mail..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#0A0A0F] border border-slate-900 rounded-xl py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-700 focus:outline-none focus:border-[#9E1B1B]"
-                  />
+
+                {/* Filter chips for quick status filtering */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
+                  {[
+                    { id: "all", label: "Todos", count: users.length },
+                    { 
+                      id: "trial_active", 
+                      label: "Em Teste Grátis", 
+                      count: users.filter(u => u.plan !== "Premium" && !u.trialTerminatedByAdmin && (u.isTrialActive || u.trialStatus === "trial_active")).length 
+                    },
+                    { 
+                      id: "forced_payment", 
+                      label: "Cobrança Ativada", 
+                      count: users.filter(u => u.trialTerminatedByAdmin || u.trialStatus === "forced_payment").length 
+                    },
+                    { 
+                      id: "premium", 
+                      label: "VIPs Permanentes", 
+                      count: users.filter(u => u.plan === "Premium").length 
+                    },
+                    { 
+                      id: "trial_expired", 
+                      label: "Teste Expirado", 
+                      count: users.filter(u => u.plan !== "Premium" && !u.trialTerminatedByAdmin && !u.isTrialActive).length 
+                    }
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => setUserStatusFilter(f.id as any)}
+                      className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                        userStatusFilter === f.id
+                          ? "bg-[#9E1B1B] text-white shadow-sm"
+                          : "bg-slate-900/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                      }`}
+                    >
+                      <span>{f.label}</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                        userStatusFilter === f.id ? "bg-white/20 text-white" : "bg-slate-800 text-slate-400"
+                      }`}>
+                        {f.count}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {isLoadingUsers ? (
                 <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
                   <Loader2 className="w-8 h-8 text-[#9E1B1B] animate-spin" />
-                  <span className="text-xs">A carregar utilizadores...</span>
+                  <span className="text-xs">A carregar utilizadores do banco de dados...</span>
                 </div>
               ) : filteredUsers.length === 0 ? (
                 <div className="p-12 text-center text-slate-500 text-xs">
-                  Nenhum utilizador encontrado no sistema. Use o formulário ao lado para registar o primeiro!
+                  Nenhum utilizador encontrado com os filtros selecionados.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-[#050507]/60 text-slate-400 border-b border-slate-900 font-semibold">
-                        <th className="p-4">Utilizador</th>
-                        <th className="p-4">E-mail</th>
-                        <th className="p-4">Plano & Estatuto</th>
-                        <th className="p-4 text-right">Ação do Desenvolvedor</th>
+                        <th className="p-3.5">Utilizador & Cadastro</th>
+                        <th className="p-3.5">Tempo & Dias Grátis Usados</th>
+                        <th className="p-3.5">Estatuto Atual</th>
+                        <th className="p-3.5 text-right">Ação do Administrador</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-900 text-slate-300">
                       {filteredUsers.map((user, idx) => {
                         const isPremium = user.plan === "Premium";
+                        const isForcedPayment = Boolean(user.trialTerminatedByAdmin || user.trialStatus === "forced_payment");
+                        const isTrialActive = Boolean(user.isTrialActive && !isPremium && !isForcedPayment);
+                        const isTrialExpired = Boolean(!isPremium && !isTrialActive && !isForcedPayment);
+
+                        // Cálculos de tempo
+                        const createdTimestamp = user.createdAt ? new Date(user.createdAt).getTime() : (user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now());
+                        const daysSinceSignup = typeof user.daysSinceCreation === "number" 
+                          ? user.daysSinceCreation 
+                          : Math.floor(Math.max(0, Date.now() - createdTimestamp) / (1000 * 60 * 60 * 24));
+                        
+                        const daysUsed = typeof user.daysUsedFree === "number" ? user.daysUsedFree : Math.min(daysSinceSignup, 7);
+                        const daysRemaining = typeof user.trialDaysRemaining === "number" ? user.trialDaysRemaining : Math.max(0, 7 - daysUsed);
+                        const progressPct = Math.min(100, Math.max(8, Math.round((daysUsed / 7) * 100)));
+
+                        const formattedCreationDate = new Date(createdTimestamp).toLocaleDateString("pt-AO", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric"
+                        });
+                        const formattedCreationTime = new Date(createdTimestamp).toLocaleTimeString("pt-AO", {
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        });
+
                         return (
-                          <tr key={idx} className="hover:bg-slate-900/10">
-                            <td className="p-4">
-                              <span className="font-bold text-white block">{user.name || "Sem Nome"}</span>
-                              <span className="text-[9px] text-slate-500 font-mono">Registo: {new Date(user.updatedAt || user.createdAt || Date.now()).toLocaleDateString()}</span>
-                              {user.password && (
-                                <span className="text-[10px] text-amber-400 font-mono block mt-1">🔑 Senha: {user.password}</span>
-                              )}
-                            </td>
-                            <td className="p-4 font-mono text-slate-400">{user.email}</td>
-                            <td className="p-4">
-                              <div className="space-y-1">
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1.5 ${
-                                  isPremium 
-                                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" 
-                                    : "bg-slate-900 text-slate-400 border border-slate-800"
-                                }`}>
-                                  {isPremium ? (
-                                    <>
-                                      <Crown className="w-3.5 h-3.5 text-emerald-400" />
-                                      <span>PREMIUM PERMANENTE (Ativo)</span>
-                                    </>
-                                  ) : (
-                                    <span>Gratuito (Free)</span>
-                                  )}
-                                </span>
-                                {isPremium && (
-                                  <span className="text-[9px] text-emerald-400/80 font-mono block">
-                                    ✓ Sempre ativo até desativação manual
+                          <tr key={user.email || idx} className="hover:bg-slate-900/20 transition-colors">
+                            {/* Coluna 1: Utilizador & Cadastro */}
+                            <td className="p-3.5 align-top space-y-1.5 min-w-[210px]">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9E1B1B]/40 to-[#FF3B30]/20 border border-[#FF3B30]/30 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                                  {(user.name || user.email || "U").charAt(0).toUpperCase()}
+                                </div>
+                                <div className="overflow-hidden">
+                                  <span className="font-bold text-white block truncate leading-tight">
+                                    {user.name || "Sem Nome"}
                                   </span>
-                                )}
-                                {user.sessions && user.sessions.length > 0 ? (
-                                  <div className="mt-2 pt-1 border-t border-slate-900 space-y-1 max-h-[64px] overflow-y-auto">
-                                    <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wide block">Logins Recentes:</span>
-                                    {user.sessions.slice(-2).reverse().map((s: string, sIdx: number) => (
-                                      <span key={sIdx} className="text-[8px] text-emerald-400 font-mono block">
-                                        🕒 {new Date(s).toLocaleString("pt-AO")}
-                                      </span>
-                                    ))}
+                                  <span className="text-[10px] text-slate-400 font-mono block truncate">
+                                    {user.email}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="bg-slate-950/60 rounded-lg p-2 border border-slate-900/80 space-y-1 text-[10px]">
+                                <div className="flex items-center gap-1.5 text-slate-400">
+                                  <Calendar className="w-3 h-3 text-[#FF3B30] shrink-0" />
+                                  <span>Cadastrado em <strong>{formattedCreationDate}</strong> às {formattedCreationTime}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                                  <Clock className="w-3 h-3 text-cyan-400 shrink-0" />
+                                  <span>
+                                    No app há: <strong className="text-white">{daysSinceSignup === 0 ? "menos de 24 horas (Hoje)" : `${daysSinceSignup} dia${daysSinceSignup > 1 ? "s" : ""}`}</strong>
+                                  </span>
+                                </div>
+                                {user.password && (
+                                  <div className="flex items-center gap-1.5 text-amber-400 font-mono pt-0.5 border-t border-slate-900">
+                                    <Key className="w-3 h-3 text-amber-400 shrink-0" />
+                                    <span>Senha: <strong>{user.password}</strong></span>
                                   </div>
-                                ) : null}
+                                )}
                               </div>
                             </td>
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-2 flex-wrap">
+
+                            {/* Coluna 2: Tempo & Dias Grátis Usados */}
+                            <td className="p-3.5 align-top space-y-2 min-w-[230px]">
+                              {isPremium ? (
+                                <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-2.5 space-y-1">
+                                  <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                                    <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                                    Assinante VIP Permanente
+                                  </span>
+                                  <p className="text-[10px] text-emerald-400/80">
+                                    Acesso irrestrito ao Amor IA. Não possui limitação de dias de teste.
+                                  </p>
+                                </div>
+                              ) : isForcedPayment ? (
+                                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-2.5 space-y-1.5">
+                                  <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                                    <Lock className="w-3.5 h-3.5 text-rose-400" />
+                                    Cobrança Forçada pelo Admin
+                                  </span>
+                                  <p className="text-[10px] text-rose-300/80 leading-tight">
+                                    Teste gratuito encerrado manualmente. O utilizador está <strong>bloqueado</strong> e é obrigado a pagar a assinatura para entrar.
+                                  </p>
+                                  <span className="text-[9px] text-slate-400 block font-mono">
+                                    Usou {daysUsed} de 7 dias antes do encerramento.
+                                  </span>
+                                </div>
+                              ) : isTrialExpired ? (
+                                <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-2.5 space-y-1.5">
+                                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                                    7 de 7 Dias Grátis Usados (Expirado)
+                                  </span>
+                                  <p className="text-[10px] text-slate-400 leading-tight">
+                                    O período de teste de 1 semana terminou naturalmente. A tela de pagamento está ativa no app.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="bg-slate-950/80 border border-slate-900 rounded-xl p-2.5 space-y-2">
+                                  <div className="flex justify-between items-center text-[11px]">
+                                    <span className="text-white font-bold flex items-center gap-1">
+                                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                      {daysUsed} de 7 dias grátis usados
+                                    </span>
+                                    <span className="text-cyan-400 font-bold font-mono">
+                                      {progressPct}%
+                                    </span>
+                                  </div>
+
+                                  {/* Barra de Progresso Visual dos 7 dias */}
+                                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
+                                    <div 
+                                      className={`h-full rounded-full transition-all duration-500 ${
+                                        daysUsed >= 6 
+                                          ? "bg-rose-500" 
+                                          : daysUsed >= 4 
+                                            ? "bg-amber-500" 
+                                            : "bg-emerald-500"
+                                      }`}
+                                      style={{ width: `${progressPct}%` }}
+                                    />
+                                  </div>
+
+                                  <div className="flex justify-between items-center text-[10px] text-slate-400 pt-0.5">
+                                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-emerald-400" />
+                                      Restam {daysRemaining} dia{daysRemaining !== 1 ? "s" : ""} de teste
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 font-mono">
+                                      Limite: 7 dias
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Coluna 3: Estatuto Atual */}
+                            <td className="p-3.5 align-top min-w-[150px]">
+                              {isPremium ? (
+                                <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1.5 shadow-sm">
+                                  <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>PREMIUM VIP</span>
+                                </span>
+                              ) : isForcedPayment ? (
+                                <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 inline-flex items-center gap-1.5 shadow-sm animate-pulse">
+                                  <Lock className="w-3.5 h-3.5 text-rose-400" />
+                                  <span>COBRANÇA ATIVADA</span>
+                                </span>
+                              ) : isTrialActive ? (
+                                <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 inline-flex items-center gap-1.5 shadow-sm">
+                                  <Clock className="w-3.5 h-3.5 text-blue-400" />
+                                  <span>TESTE ATIVO ({daysRemaining}d)</span>
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5 shadow-sm">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>TESTE EXPIRADO</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Coluna 4: Ação do Administrador */}
+                            <td className="p-3.5 align-top text-right min-w-[210px]">
+                              <div className="flex flex-col items-end gap-2">
+                                
+                                {/* BOTÃO 1: ATIVAR COBRANÇA (EXIGIR PAGAMENTO) OU REATIVAR 7 DIAS GRÁTIS */}
+                                {!isPremium && (
+                                  !isForcedPayment ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleForcePayment(user.email, true)}
+                                      className="w-full sm:w-auto py-2 px-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center sm:justify-start gap-1.5"
+                                      title="Encerrar teste de graça agora mesmo e obrigar o utilizador a pagar uma assinatura para aceder"
+                                    >
+                                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>Ativar Cobrança (Exigir Pagamento)</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleForcePayment(user.email, false)}
+                                      className="w-full sm:w-auto py-2 px-3 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center sm:justify-start gap-1.5"
+                                      title="Devolver 7 dias de teste gratuito a este utilizador"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+                                      <span>Reativar 7 Dias Grátis</span>
+                                    </button>
+                                  )
+                                )}
+
+                                {/* BOTÃO 2: ATIVAR/DESATIVAR PREMIUM VIP PERMANENTE */}
                                 {!isPremium ? (
                                   <button
                                     type="button"
                                     onClick={() => handleTogglePermanentPremium(user.email, "Premium")}
-                                    className="py-2 px-3.5 bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md inline-flex items-center gap-1.5"
-                                    title="Ativar Premium Permanente (Fica sempre ativo até você desativar)"
+                                    className="w-full sm:w-auto py-2 px-3 bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-400 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center sm:justify-start gap-1.5"
+                                    title="Ativar Acesso VIP Permanente sem expiração"
                                   >
-                                    <CheckCircle className="w-4 h-4 text-white" />
-                                    <span>Ativar Premium Permanente</span>
+                                    <Crown className="w-3.5 h-3.5 text-amber-300" />
+                                    <span>Ativar VIP Permanente</span>
                                   </button>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => handleTogglePermanentPremium(user.email, "Free")}
-                                    className="py-2 px-3.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-500/50 text-rose-300 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md inline-flex items-center gap-1.5"
-                                    title="Desativar Premium Permanente (Mudar utilizador para Free)"
+                                    className="w-full sm:w-auto py-2 px-3 bg-rose-950/60 hover:bg-rose-900 border border-rose-500/50 text-rose-300 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center sm:justify-start gap-1.5"
+                                    title="Remover VIP e voltar utilizador para Gratuito"
                                   >
-                                    <XCircle className="w-4 h-4 text-rose-400" />
-                                    <span>Desativar (Mudar para Free)</span>
+                                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                                    <span>Remover VIP (Free)</span>
                                   </button>
                                 )}
+
                               </div>
                             </td>
                           </tr>

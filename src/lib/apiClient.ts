@@ -97,44 +97,52 @@ export async function apiRequest<T = any>(
   const responseReqId = response.headers.get("X-Request-ID") || requestId;
   const contentType = response.headers.get("content-type") || "";
 
-  // Se a resposta NÃO for JSON (ex: HTML de erro do proxy, 404 em HTML, 502 Bad Gateway)
-  if (!contentType.includes("application/json")) {
-    const rawText = await response.text().catch(() => "");
-    const preview = rawText.substring(0, 150).trim();
+  // 1. Ler o corpo como texto em primeiro lugar para evitar bloqueio de stream e SyntaxErrors nativos
+  const rawText = await response.text().catch(() => "");
+  const trimmed = rawText.trim();
+  const isJsonHeader = contentType.includes("application/json");
+  const looksLikeJson = (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+  // 2. Se a resposta NÃO for JSON (ex: HTML de erro de servidor, página 404 Vercel, 502 Bad Gateway)
+  if (!isJsonHeader || !looksLikeJson) {
+    const preview = trimmed.substring(0, 160);
     console.warn(`[API Non-JSON Response] ${endpoint} Status: ${response.status} (ReqID: ${responseReqId}):`, preview);
 
-    let friendlyMessage = "O servidor devolveu uma resposta inesperada. Tente novamente em instantes.";
+    let friendlyMessage = "O servidor devolveu uma resposta não reconhecida. Por favor, tente novamente.";
 
     if (response.status === 404) {
       friendlyMessage = "O serviço solicitado não foi encontrado no servidor (404).";
+    } else if (response.status === 409) {
+      friendlyMessage = "Este e-mail já se encontra registado. Aceda com a sua palavra-passe.";
     } else if (response.status === 502 || response.status === 503 || response.status === 504) {
       friendlyMessage = "Serviço temporariamente indisponível. Estamos a restabelecer a ligação.";
     } else if (response.status === 401 || response.status === 403) {
       friendlyMessage = "Acesso não autorizado ou sessão expirada. Por favor, inicie sessão.";
-    } else if (preview.toLowerCase().includes("the page") || preview.toLowerCase().includes("cannot be found")) {
-      friendlyMessage = "Servidor em manutenção ou a reiniciar. Por favor, aguarde alguns segundos e tente novamente.";
+    } else if (preview.toLowerCase().includes("the page") || preview.toLowerCase().includes("cannot be found") || preview.toLowerCase().includes("not found")) {
+      friendlyMessage = "O serviço solicitado está temporariamente indisponível na infraestrutura de produção. Tente novamente em instantes.";
     }
 
     throw new ApiError(
       friendlyMessage,
-      "INVALID_CONTENT_TYPE",
+      response.status === 409 ? "ACCOUNT_EXISTS" : "INVALID_CONTENT_TYPE",
       response.status,
       responseReqId,
       { rawPreview: preview }
     );
   }
 
-  // Tentar parsear o JSON com proteção
+  // 3. Tentar parsear o JSON com proteção total
   let data: any;
   try {
-    data = await response.json();
+    data = JSON.parse(rawText);
   } catch (jsonErr: any) {
-    console.error(`[API JSON Parse Error] Falha ao processar resposta JSON de ${endpoint} (ReqID: ${responseReqId}):`, jsonErr);
+    console.warn(`[API JSON Parse Error] ${endpoint} (ReqID: ${responseReqId}):`, jsonErr);
     throw new ApiError(
       "Resposta do servidor em formato inválido. Tente novamente.",
       "JSON_PARSE_ERROR",
       response.status,
-      responseReqId
+      responseReqId,
+      { rawPreview: trimmed.substring(0, 100) }
     );
   }
 

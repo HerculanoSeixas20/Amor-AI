@@ -24,9 +24,10 @@ import {
   SinglesModeView
 } from "./components/ModuleViews";
 
-import { Crown, HelpCircle, Activity, Sparkles, LogOut, Check, Heart, MessageSquare, Compass, Zap, Database, Plus, X, ShieldAlert } from "lucide-react";
+import { Crown, HelpCircle, Activity, Sparkles, LogOut, Check, Heart, MessageSquare, Compass, Zap, Database, Plus, X, ShieldAlert, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { apiRequest } from "./lib/apiClient";
+import { isSupabaseConfigured, handleAuthCallback } from "./lib/supabase";
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -40,8 +41,30 @@ export default function App() {
   const [isVipModalOpen, setIsVipModalOpen] = useState(false);
   const [isFloatingMenuOpen, setIsFloatingMenuOpen] = useState(false);
 
-  // Sync state with simulated local session
+  // Sync state with simulated local session or OAuth redirect callback
   useEffect(() => {
+    // 1. Verificar se estamos num callback do Supabase / Google OAuth
+    const isCallback = 
+      window.location.pathname.includes("/auth/callback") || 
+      window.location.hash.includes("access_token=") || 
+      window.location.search.includes("code=");
+
+    if (isCallback && isSupabaseConfigured()) {
+      handleAuthCallback().then(({ user, error }) => {
+        if (user && !error) {
+          handleLoginSuccess(user.email, user.name, "Free", {
+            avatar: user.avatar,
+            provider: "Google"
+          });
+          window.history.replaceState({}, document.title, "/");
+        } else if (error) {
+          console.warn("Aviso no callback de autenticação Supabase:", error);
+          window.history.replaceState({}, document.title, "/");
+        }
+      });
+      return;
+    }
+
     const savedUserStr = localStorage.getItem("amor_ia_user");
     const savedProfileStr = localStorage.getItem("amor_ia_profile");
 
@@ -77,35 +100,25 @@ export default function App() {
       }
 
       // Sincronizar assinatura real do servidor de forma assíncrona
-        fetch(`/api/user-subscription?email=${encodeURIComponent(parsedUser.email)}`)
-          .then(res => {
-            if (!res.ok) {
-              throw new Error(`HTTP ${res.status}`);
-            }
-            const contentType = res.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/json")) {
-              throw new TypeError("O servidor não retornou JSON!");
-            }
-            return res.json();
-          })
-          .then(data => {
-            if (data.success && data.plan) {
-              const updatedUser = { ...parsedUser, plan: data.plan };
-              localStorage.setItem("amor_ia_user", JSON.stringify(updatedUser));
-              setAuthState({
-                user: updatedUser,
-                isAuthenticated: true,
-                loading: false,
-              });
+      apiRequest<{ success: boolean; plan?: "Free" | "Premium" }>(`/api/user-subscription?email=${encodeURIComponent(parsedUser.email)}`)
+        .then(data => {
+          if (data && data.success && data.plan) {
+            const updatedUser = { ...parsedUser, plan: data.plan };
+            localStorage.setItem("amor_ia_user", JSON.stringify(updatedUser));
+            setAuthState({
+              user: updatedUser,
+              isAuthenticated: true,
+              loading: false,
+            });
 
-              if (parsedProfile) {
-                const updatedProfile = { ...parsedProfile, subscriptionTier: data.plan };
-                localStorage.setItem("amor_ia_profile", JSON.stringify(updatedProfile));
-                setUserProfile(updatedProfile);
-              }
+            if (parsedProfile) {
+              const updatedProfile = { ...parsedProfile, subscriptionTier: data.plan };
+              localStorage.setItem("amor_ia_profile", JSON.stringify(updatedProfile));
+              setUserProfile(updatedProfile);
             }
-          })
-          .catch(err => console.warn("Aviso ao sincronizar subscrição inicial com o servidor:", err));
+          }
+        })
+        .catch(err => console.warn("Aviso ao sincronizar subscrição inicial com o servidor:", err));
     } else {
       if (parsedProfile) {
         setUserProfile(parsedProfile);
@@ -340,12 +353,10 @@ export default function App() {
   };
 
   const handleUpdateUserPlan = (email: string, plan: "Free" | "Premium", durationDays: number = 30) => {
-    fetch("/api/admin/update-subscription", {
+    apiRequest<{ success: boolean }>("/api/admin/update-subscription", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, plan, durationDays, adminEmail: "chillplaces9@gmail.com" })
     })
-      .then(res => res.json())
       .then(data => {
         if (data.success) {
           const targetEmail = email.toLowerCase().trim();
@@ -368,17 +379,30 @@ export default function App() {
   const syncSubscription = async () => {
     if (!authState.user) return;
     try {
-      const res = await fetch(`/api/user-subscription?email=${encodeURIComponent(authState.user.email)}`);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new TypeError("O servidor não retornou JSON!");
-      }
-      const data = await res.json();
-      if (data.success && data.plan) {
-        const updatedUser = { ...authState.user, plan: data.plan };
+      const data = await apiRequest<{
+        success: boolean;
+        plan?: "Free" | "Premium";
+        isTrialActive?: boolean;
+        trialEndsAt?: string;
+        trialDaysRemaining?: number;
+        daysUsedFree?: number;
+        daysSinceCreation?: number;
+        trialStatus?: string;
+        trialTerminatedByAdmin?: boolean;
+      }>(`/api/user-subscription?email=${encodeURIComponent(authState.user.email)}`);
+
+      if (data && data.success && data.plan) {
+        const updatedUser = { 
+          ...authState.user, 
+          plan: data.plan,
+          isTrialActive: data.isTrialActive,
+          trialEndsAt: data.trialEndsAt,
+          trialDaysRemaining: data.trialDaysRemaining,
+          daysUsedFree: data.daysUsedFree,
+          daysSinceCreation: data.daysSinceCreation,
+          trialStatus: data.trialStatus,
+          trialTerminatedByAdmin: data.trialTerminatedByAdmin
+        };
         localStorage.setItem("amor_ia_user", JSON.stringify(updatedUser));
         setAuthState(prev => ({
           ...prev,
@@ -387,12 +411,12 @@ export default function App() {
 
         if (userProfile) {
           const updatedProfile = { ...userProfile, subscriptionTier: data.plan };
-          localStorage.setItem("amor_ia_profile", JSON.stringify(updatedProfile));
           setUserProfile(updatedProfile);
+          localStorage.setItem("amor_ia_profile", JSON.stringify(updatedProfile));
         }
       }
     } catch (err) {
-      console.warn("Aviso ao sincronizar subscrição com o servidor (silencioso):", err);
+      console.warn("Aviso ao sincronizar subscrição com o servidor:", err);
     }
   };
 
@@ -407,10 +431,10 @@ export default function App() {
   useEffect(() => {
     if (!authState.isAuthenticated || !authState.user) return;
     
-    // Sincronizar a cada 8 segundos em segundo plano para reação imediata
+    // Sincronizar a cada 5 segundos em segundo plano para reação imediata a comandos do painel admin
     const interval = setInterval(() => {
       syncSubscription();
-    }, 8000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [authState.isAuthenticated, authState.user?.email]);
 
@@ -422,8 +446,33 @@ export default function App() {
   const isUserPremium = authState.user?.plan === "Premium";
   const isAdmin = authState.user?.email === "chillplaces9@gmail.com" || authState.user?.email === "chiilplaces9@gmail.com";
 
-  // SE NÃO FOR PREMIUM E NÃO FOR ADMIN, BLOQUEIA COMPLETAMENTE O ACESSO E PEDE O PAGAMENTO COM A ESTRELA DESTAQUE
-  if (!isUserPremium && !isAdmin) {
+  // Período de Avaliação Gratuita de 1 semana (7 dias) na primeira vez que o usuário entra no app
+  // Se o administrador tiver forçado a cobrança ou o teste tiver expirado, isTrialActive é false
+  const isTrialActive = Boolean(
+    !isUserPremium && !isAdmin && 
+    !authState.user?.trialTerminatedByAdmin && 
+    (
+      authState.user?.isTrialActive === true || (
+        authState.user?.isTrialActive !== false &&
+        authState.user?.trialEndsAt && new Date(authState.user.trialEndsAt).getTime() > Date.now()
+      )
+    )
+  );
+
+  const trialEndsAtDate = authState.user?.trialEndsAt 
+    ? new Date(authState.user.trialEndsAt) 
+    : (authState.user?.createdAt ? new Date(new Date(authState.user.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000) : null);
+
+  const trialDaysRemaining = typeof authState.user?.trialDaysRemaining === "number" && authState.user.trialDaysRemaining > 0
+    ? authState.user.trialDaysRemaining
+    : (trialEndsAtDate ? Math.max(1, Math.ceil((trialEndsAtDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 7);
+
+  const hasAccess = isUserPremium || isAdmin || isTrialActive;
+
+  // SE NÃO FOR PREMIUM, NÃO FOR ADMIN E O PERÍODO DE TESTE DE 7 DIAS JÁ TIVER TERMINADO OU COBRANÇA FORÇADA:
+  // BLOQUEIA COMPLETAMENTE O ACESSO E PEDE PARA PAGAR AS ASSINATURAS
+  if (!hasAccess) {
+    const isForcedPayment = authState.user?.trialTerminatedByAdmin;
     return (
       <div className="min-h-screen bg-[#050507] text-slate-100 flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
         {/* Glowing Backgrounds */}
@@ -432,16 +481,24 @@ export default function App() {
 
         <div className="w-full max-w-4xl bg-slate-950/70 backdrop-blur-3xl border border-slate-900 rounded-[2.5rem] p-6 md:p-10 shadow-2xl relative z-10 space-y-8">
           
-          {/* Header with Star / Sparkles Icon */}
+          {/* Header with Expired Alert Icon */}
           <div className="text-center space-y-3">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#FF3B30]/10 border border-[#FF3B30]/30 shadow-[0_0_20px_rgba(255,59,48,0.2)] text-amber-400 animate-bounce mb-2">
               <Sparkles className="w-8 h-8 fill-amber-400" />
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white font-display flex items-center justify-center gap-2">
-              Amor <span className="text-[#FF3B30]">IA</span> Premium VIP
+              {isForcedPayment ? "Ativação de Assinatura Obrigatória" : "O Seu Teste de 1 Semana Expirou"}
             </h1>
             <p className="text-sm text-slate-400 max-w-xl mx-auto">
-              Olá, <strong className="text-white">{authState.user?.name}</strong>! O acesso completo à plataforma Amor IA está atualmente inativo. Ative a sua subscrição VIP Premium para desbloquear todas as funcionalidades exclusivas e conselhos de psicologia amorosa inteligente.
+              {isForcedPayment ? (
+                <>
+                  Olá, <strong className="text-white">{authState.user?.name}</strong>! O <strong>Amor IA</strong> é um aplicativo pago. O acesso gratuito de demonstração foi concluído. Para continuar a transformar o seu relacionamento e aceder a todas as funcionalidades inteligentes, ative uma das nossas assinaturas:
+                </>
+              ) : (
+                <>
+                  Olá, <strong className="text-white">{authState.user?.name}</strong>! O <strong>Amor IA</strong> é um aplicativo pago. O seu período experimental gratuito de 7 dias chegou ao fim. Para continuar a transformar o seu relacionamento e aceder a todas as funcionalidades exclusivas, ative uma das nossas assinaturas:
+                </>
+              )}
             </p>
           </div>
 
@@ -459,7 +516,7 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-900/60 pt-6 text-[11px] text-slate-500">
             <span className="flex items-center gap-2 font-mono">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-              Sincronização em tempo real ativa. Aguardando ativação automática do administrador...
+              Sincronização em tempo real ativa. Aguardando validação de pagamento...
             </span>
             <button
               onClick={handleLogout}
@@ -499,13 +556,13 @@ export default function App() {
 
     const isUserPremium = authState.user?.plan === "Premium";
 
-    if (isPremiumRoute && !isUserPremium) {
+    if (isPremiumRoute && !isUserPremium && !isTrialActive) {
       return (
         <div className="space-y-6">
           <div className="bg-[#9E1B1B]/15 border border-[#9E1B1B]/30 rounded-3xl p-6 text-center space-y-3 max-w-2xl mx-auto">
-            <h2 className="text-lg font-bold text-white font-display">Recurso Premium Bloqueado</h2>
+            <h2 className="text-lg font-bold text-white font-display">Período de Teste Expirado</h2>
             <p className="text-xs text-slate-400">
-              O módulo avançado <strong className="text-[#FF3B30] uppercase">"{currentModule}"</strong> requer uma subscrição ativa de membro VIP Premium.
+              O seu período de teste de 7 dias expirou. O módulo avançado <strong className="text-[#FF3B30] uppercase">"{currentModule}"</strong> requer uma subscrição ativa de membro VIP Premium.
             </p>
           </div>
           <SubscriptionView
@@ -589,21 +646,32 @@ export default function App() {
       authState={authState}
     >
       <div className="space-y-6 relative">
-        {/* VIP Upgrade Micro-Banner */}
+        {/* VIP Upgrade / Trial Micro-Banner */}
         {authState.user?.plan !== "Premium" && (
-          <div className="bg-gradient-to-r from-[#9E1B1B] to-[#E11D48] border border-[#FF3B30]/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-lg text-white font-sans animate-pulse-subtle">
+          <div className="bg-gradient-to-r from-[#1c1917] via-[#1e1b4b] to-[#0f172a] border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-lg text-white font-sans">
             <div className="flex items-center gap-3">
-              <Crown className="w-5 h-5 text-white animate-pulse" />
+              <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 shrink-0">
+                <Clock className="w-5 h-5 animate-pulse" />
+              </div>
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">Acesso Premium VIP do Amor IA — 5.000 Kzs/mês</h4>
-                <p className="text-[11px] text-white/95 font-medium font-sans">Desbloqueie análises de diálogos infinitas, simulações avançadas de chat e planos de reconquista personalizados.</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                    Período de Teste de 1 Semana Ativo
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">
+                    {trialDaysRemaining} {trialDaysRemaining === 1 ? "dia restante" : "dias restantes"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 font-medium font-sans mt-0.5">
+                  O Amor IA é um app pago. Planos disponíveis: <strong>3.000 Kzs/mês</strong>, <strong>9.000 Kzs/trimestre</strong> e <strong>20.000 Kzs/ano</strong>. Ative a sua subscrição para garantir acesso contínuo.
+                </p>
               </div>
             </div>
             <button
-              onClick={() => setCurrentModule("pricing")}
-              className="py-2 px-4 bg-white text-[#9E1B1B] font-extrabold text-[10px] uppercase rounded-xl hover:bg-slate-100 hover:text-[#B91C1C] transition-all self-stretch sm:self-auto text-center cursor-pointer"
+              onClick={() => setCurrentModule("subscription")}
+              className="py-2.5 px-4 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition-all self-stretch sm:self-auto text-center cursor-pointer shrink-0 shadow-lg shadow-red-950/40"
             >
-              Fazer Upgrade VIP
+              Ver Planos & Assinar
             </button>
           </div>
         )}

@@ -6,6 +6,7 @@ import {
 import { AuthState } from "../types";
 import { apiRequest, ApiError } from "../lib/apiClient";
 import { signInWithGooglePopup } from "../lib/firebase";
+import { isSupabaseConfigured, signInWithGoogleSupabase } from "../lib/supabase";
 
 interface LoginProps {
   onLoginSuccess: (email: string, name: string, plan: "Free" | "Premium") => void;
@@ -189,6 +190,16 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     setError(null);
     setMessage(null);
     try {
+      // 1. Se o Supabase estiver configurado nas variáveis de ambiente do projeto, usar fluxo OAuth Supabase
+      if (isSupabaseConfigured()) {
+        const { error: sbError } = await signInWithGoogleSupabase();
+        if (sbError) {
+          throw sbError;
+        }
+        return; // O Supabase redireciona o navegador para o ecrã do Google
+      }
+
+      // 2. Fluxo com Firebase Google Auth Popup
       const googleUser = await signInWithGooglePopup();
       // Chamar API de autenticação do Google de Contas
       const data = await apiRequest<{ success: boolean; user?: any }>("/api/auth/google", {
@@ -220,6 +231,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
       if (err?.code === "auth/popup-blocked" || err?.message?.includes("popup")) {
         setError("A janela emergente do Google foi bloqueada pelo navegador. Pode aceder através do e-mail abaixo.");
+        return;
+      }
+      if (err?.code === "auth/unauthorized-domain") {
+        setError("O domínio da aplicação (amor-ai.vercel.app) precisa ser adicionado à lista de Domínios Autorizados no Firebase Console (Authentication > Settings > Authorized domains). Também pode iniciar sessão com e-mail e palavra-passe.");
         return;
       }
       setError(err?.message || "Erro ao conectar com a API de Contas Google.");

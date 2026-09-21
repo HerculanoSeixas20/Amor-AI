@@ -47,5 +47,26 @@
     "event": "Comprovativo enviado automaticamente por interação do utilizador",
     "user": "teste.producao@amoria.com",
     "timestamp": "2026-09-20T17:29:13.311Z"
+  },
+  {
+    "id": "H-XV8UNG5AE",
+    "paymentId": "PAY-N8XJU8DR2",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "testeproducao@gmail.com",
+    "timestamp": "2026-09-21T12:18:26.502Z"
+  },
+  {
+    "id": "H-THLKLY9DI",
+    "paymentId": "PAY-PKKCG53EK",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "testegoogle@gmail.com",
+    "timestamp": "2026-09-21T12:18:38.915Z"
+  },
+  {
+    "id": "H-1FD8VZA9M",
+    "paymentId": "PAY-M8MDVG2R6",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "novo.usuario.teste@gmail.com",
+    "timestamp": "2026-09-21T12:26:09.456Z"
   }
 ]

@@ -32,15 +32,62 @@ app.use((req, res, next) => {
   next();
 });
 
+// Rotas conhecidas da API que aceitam compatibilidade sem o prefixo /api
+const KNOWN_API_ENDPOINTS = new Set([
+  "/register-user",
+  "/register",
+  "/signup",
+  "/login",
+  "/signin",
+  "/auth/google",
+  "/auth/google-login",
+  "/google-login",
+  "/auth/register",
+  "/auth/signup",
+  "/auth/login",
+  "/auth/signin",
+  "/auth/session",
+  "/auth/callback",
+  "/session",
+  "/me",
+  "/forgot-password",
+  "/reset-password",
+  "/user-subscription",
+  "/user-status",
+  "/user-activity",
+  "/health",
+  "/supabase/sync",
+  "/supabase/test"
+]);
+
+// Middleware de normalização e compatibilidade de rotas (Vercel Serverless & Local):
+// Apenas normaliza se for expressamente um endpoint conhecido da API
+app.use((req, res, next) => {
+  const cleanPath = req.path.replace(/\/+$/, "");
+  if (KNOWN_API_ENDPOINTS.has(cleanPath)) {
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    req.url = `/api${cleanPath}${qs}`;
+  }
+  next();
+});
+
 // Middleware de registo de requisições de API para monitorização
 app.use((req, res, next) => {
-  if (req.path.startsWith("/api/")) {
+  if (req.path.startsWith("/api/") || req.url.startsWith("/api/")) {
     const start = Date.now();
     const reqId = (req as any).id;
     res.on("finish", () => {
       const duration = Date.now() - start;
       console.log(`[API_REQ] [${new Date().toISOString()}] ${req.method} ${req.path} -> Status ${res.statusCode} (${duration}ms) [ReqID: ${reqId}]`);
     });
+  }
+  next();
+});
+
+// Salvaguarda para Vercel Serverless: se o body já foi processado pelo runtime da Vercel
+app.use((req, res, next) => {
+  if ((req as any).body !== undefined && !(req as any)._body) {
+    (req as any)._body = true;
   }
   next();
 });
@@ -1880,6 +1927,8 @@ interface SavedUser {
   plan: "Free" | "Premium";
   activationDate?: string;
   expirationDate?: string;
+  trialEndsAt?: string;
+  trialTerminatedByAdmin?: boolean;
   updatedAt: string;
   password?: string;
   sessions?: string[];
@@ -1893,6 +1942,73 @@ interface SavedUser {
   recoveryCode?: string;
   recoveryCodeExpires?: string;
   quizAnswers?: Record<string, string>;
+}
+
+function getUserTrialInfo(user: SavedUser): { 
+  isTrialActive: boolean; 
+  trialEndsAt: string; 
+  trialDaysRemaining: number;
+  daysUsedFree: number;
+  daysSinceCreation: number;
+  trialStatus: "premium" | "trial_active" | "trial_expired" | "forced_payment";
+  trialTerminatedByAdmin: boolean;
+} {
+  const isDev = isDeveloperEmail(user.email);
+  const createdTime = user.createdAt ? new Date(user.createdAt).getTime() : Date.now();
+  const elapsedMs = Math.max(0, Date.now() - createdTime);
+  const daysSinceCreation = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+
+  if (isDev || user.plan === "Premium") {
+    return {
+      isTrialActive: false,
+      trialEndsAt: "",
+      trialDaysRemaining: 0,
+      daysUsedFree: 0,
+      daysSinceCreation,
+      trialStatus: "premium",
+      trialTerminatedByAdmin: false
+    };
+  }
+
+  // Se o administrador forçou a cobrança / encerrou o teste do utilizador:
+  if (user.trialTerminatedByAdmin) {
+    return {
+      isTrialActive: false,
+      trialEndsAt: user.trialEndsAt || new Date(0).toISOString(),
+      trialDaysRemaining: 0,
+      daysUsedFree: Math.max(1, Math.min(daysSinceCreation, 7)),
+      daysSinceCreation,
+      trialStatus: "forced_payment",
+      trialTerminatedByAdmin: true
+    };
+  }
+
+  let trialEndsAt = user.trialEndsAt;
+  if (!trialEndsAt) {
+    if (user.createdAt) {
+      trialEndsAt = new Date(createdTime + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else {
+      trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    }
+  }
+
+  const endTime = new Date(trialEndsAt).getTime();
+  const now = Date.now();
+  const isTrialActive = now < endTime;
+  const trialDaysRemaining = isTrialActive ? Math.max(1, Math.ceil((endTime - now) / (1000 * 60 * 60 * 24))) : 0;
+  
+  // Quantos dias já usou de graça:
+  const daysUsed = Math.min(Math.max(daysSinceCreation, 7 - trialDaysRemaining), 7);
+
+  return {
+    isTrialActive,
+    trialEndsAt,
+    trialDaysRemaining,
+    daysUsedFree: isTrialActive ? daysUsed : 7,
+    daysSinceCreation,
+    trialStatus: isTrialActive ? "trial_active" : "trial_expired",
+    trialTerminatedByAdmin: false
+  };
 }
 
 async function syncUserToSupabase(user: SavedUser) {
@@ -2110,7 +2226,7 @@ function autoCreateProofForUser(email: string, name: string) {
         email: cleanEmail,
         name: name || email.split("@")[0],
         plan: "Plano Premium VIP Mensal",
-        value: "5.000 Kzs",
+        value: "3.000 Kzs",
         method: "Multicaixa Express (Automático)",
         phone: "923000000",
         date: formattedDate,
@@ -2132,6 +2248,26 @@ function autoCreateProofForUser(email: string, name: string) {
     console.error("Erro ao gerar comprovativo automático:", err);
   }
 }
+
+// 0. Endpoints de verificação de estado e saúde da API (Health Check)
+app.get(["/api", "/api/", "/api/health", "/health"], (req, res) => {
+  return res.json({
+    success: true,
+    status: "ok",
+    app: "Amor IA",
+    message: "Servidor Amor IA operacional.",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+    runtime: isVercelRuntime ? "vercel-serverless" : "node-standalone"
+  });
+});
+
+// Endpoint de Callback OAuth para Supabase / Google
+app.all(["/api/auth/callback", "/auth/callback"], (req, res) => {
+  const query = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  return res.redirect(`/#/auth/callback${query}`);
+});
 
 // 1. POST /api/register-user & aliases (/api/register, /api/signup, /api/auth/register, /api/auth/signup)
 const handleRegisterUser = (req: express.Request, res: express.Response) => {
@@ -2166,6 +2302,7 @@ const handleRegisterUser = (req: express.Request, res: express.Response) => {
     let isNewUser = false;
     if (!existing) {
       isNewUser = true;
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       existing = {
         email: cleanEmail,
         name: (name && String(name).trim()) || cleanEmail.split("@")[0],
@@ -2177,6 +2314,7 @@ const handleRegisterUser = (req: express.Request, res: express.Response) => {
         provider: provider || "Email",
         createdAt: nowStr,
         lastLogin: nowStr,
+        trialEndsAt,
         country: country || "Angola",
         language: language || "Português",
         currency: currency || "AOA",
@@ -2187,6 +2325,14 @@ const handleRegisterUser = (req: express.Request, res: express.Response) => {
       // Se a conta já existe e o utilizador submeteu registo com a mesma senha ou senha universal/dev, autentica suavemente
       if (isRegistration && existing.password && existing.password !== cleanPassword && !isDev && cleanPassword !== "123") {
         return sendError(res, 409, "ACCOUNT_EXISTS", "Este e-mail já possui conta criada. Por favor, introduza a sua palavra-passe na aba 'Iniciar Sessão'.");
+      }
+
+      if (!existing.trialEndsAt) {
+        if (existing.createdAt) {
+          existing.trialEndsAt = new Date(new Date(existing.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        } else {
+          existing.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
       }
 
       if (name && String(name).trim()) existing.name = String(name).trim();
@@ -2217,9 +2363,17 @@ const handleRegisterUser = (req: express.Request, res: express.Response) => {
       autoCreateProofForUser(existing.email, existing.name);
     }
 
+    const trialInfo = getUserTrialInfo(existing);
+    const userPayload = {
+      ...existing,
+      trialEndsAt: trialInfo.trialEndsAt,
+      isTrialActive: trialInfo.isTrialActive,
+      trialDaysRemaining: trialInfo.trialDaysRemaining
+    };
+
     const statusCode = isNewUser ? 201 : 200;
     const msg = isNewUser ? "Conta criada com sucesso." : "Sessão iniciada com sucesso.";
-    return sendSuccess(res, { user: existing }, msg, statusCode);
+    return sendSuccess(res, { user: userPayload }, msg, statusCode);
   } catch (err: any) {
     return sendError(res, 500, "REGISTRATION_ERROR", err.message || "Erro interno ao processar registo de utilizador.");
   }
@@ -2249,6 +2403,7 @@ const handleGoogleAuth = (req: express.Request, res: express.Response) => {
     let isNew = false;
     if (!existing) {
       isNew = true;
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       existing = {
         email: cleanEmail,
         name: (name && String(name).trim()) || cleanEmail.split("@")[0],
@@ -2260,6 +2415,7 @@ const handleGoogleAuth = (req: express.Request, res: express.Response) => {
         provider: "Google",
         createdAt: nowStr,
         lastLogin: nowStr,
+        trialEndsAt,
         country: "Angola",
         language: "Português",
         currency: "AOA",
@@ -2267,6 +2423,13 @@ const handleGoogleAuth = (req: express.Request, res: express.Response) => {
       };
       subs.push(existing);
     } else {
+      if (!existing.trialEndsAt) {
+        if (existing.createdAt) {
+          existing.trialEndsAt = new Date(new Date(existing.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        } else {
+          existing.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
+      }
       if (name && String(name).trim()) existing.name = String(name).trim();
       if (avatar) existing.avatar = avatar;
       existing.provider = "Google";
@@ -2291,7 +2454,15 @@ const handleGoogleAuth = (req: express.Request, res: express.Response) => {
       autoCreateProofForUser(existing.email, existing.name);
     }
 
-    return sendSuccess(res, { user: existing }, isNew ? "Conta Google registada com sucesso!" : "Autenticação Google concluída com sucesso.", isNew ? 201 : 200);
+    const trialInfo = getUserTrialInfo(existing);
+    const userPayload = {
+      ...existing,
+      trialEndsAt: trialInfo.trialEndsAt,
+      isTrialActive: trialInfo.isTrialActive,
+      trialDaysRemaining: trialInfo.trialDaysRemaining
+    };
+
+    return sendSuccess(res, { user: userPayload }, isNew ? "Conta Google registada com sucesso!" : "Autenticação Google concluída com sucesso.", isNew ? 201 : 200);
   } catch (err: any) {
     return sendError(res, 500, "GOOGLE_AUTH_ERROR", err.message || "Erro interno na autenticação Google.");
   }
@@ -2326,6 +2497,7 @@ const handleLoginUser = (req: express.Request, res: express.Response) => {
     // Se o utilizador ainda não existe, cria a conta automaticamente para nunca bloquear o login com erro de utilizador não encontrado
     if (!found) {
       const defaultName = cleanEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       found = {
         email: cleanEmail,
         name: defaultName,
@@ -2337,6 +2509,7 @@ const handleLoginUser = (req: express.Request, res: express.Response) => {
         avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
         provider: "Email",
         createdAt: nowStr,
+        trialEndsAt,
         country: "Angola",
         language: "Português",
         currency: "AOA"
@@ -2349,7 +2522,24 @@ const handleLoginUser = (req: express.Request, res: express.Response) => {
         autoCreateProofForUser(found.email, found.name);
       }
 
-      return sendSuccess(res, { user: found }, "Conta criada e sessão iniciada com sucesso!", 201);
+      const trialInfo = getUserTrialInfo(found);
+      const userPayload = {
+        ...found,
+        trialEndsAt: trialInfo.trialEndsAt,
+        isTrialActive: trialInfo.isTrialActive,
+        trialDaysRemaining: trialInfo.trialDaysRemaining
+      };
+
+      return sendSuccess(res, { user: userPayload }, "Conta criada e sessão iniciada com sucesso!", 201);
+    }
+
+    // Garantir trialEndsAt
+    if (!found.trialEndsAt) {
+      if (found.createdAt) {
+        found.trialEndsAt = new Date(new Date(found.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      } else {
+        found.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      }
     }
 
     // Se for conta de desenvolvedor, garantir plano Premium
@@ -2390,7 +2580,15 @@ const handleLoginUser = (req: express.Request, res: express.Response) => {
       autoCreateProofForUser(found.email, found.name);
     }
 
-    return sendSuccess(res, { user: found }, "Sessão iniciada com sucesso.");
+    const trialInfo = getUserTrialInfo(found);
+    const userPayload = {
+      ...found,
+      trialEndsAt: trialInfo.trialEndsAt,
+      isTrialActive: trialInfo.isTrialActive,
+      trialDaysRemaining: trialInfo.trialDaysRemaining
+    };
+
+    return sendSuccess(res, { user: userPayload }, "Sessão iniciada com sucesso.");
   } catch (err: any) {
     return sendError(res, 500, "LOGIN_ERROR", err.message || "Erro interno ao processar início de sessão.");
   }
@@ -2571,20 +2769,16 @@ app.get("/api/user-subscription", (req, res) => {
     }
     const cleanEmail = String(email).toLowerCase().trim();
     const subs = loadSubscriptions();
-    const found = subs.find(u => u.email === cleanEmail);
+    let found = subs.find(u => u.email === cleanEmail);
     
     // REGRA CRÍTICA DO UTILIZADOR:
     // "sempre que eu ativar o premium de um utilizador ele precisa estar sempre ativado até eu desativar enquanto eu não desativar não pode desativar"
     // Portanto, o plano Premium NUNCA expira automaticamente nem reverte para Free sem desativação manual do desenvolvedor!
-    let daysRemaining = 0;
-    if (found && found.plan === "Premium") {
-      daysRemaining = 9999; // Sempre ativo de forma permanente
-    }
-
     const allPayments = loadPayments();
     const userPayments = allPayments.filter(p => p.email === cleanEmail);
 
     if (found) {
+      const trialInfo = getUserTrialInfo(found);
       res.json({
         success: true,
         plan: found.plan,
@@ -2593,17 +2787,32 @@ app.get("/api/user-subscription", (req, res) => {
         isPermanent: found.plan === "Premium",
         activationDate: found.activationDate || null,
         expirationDate: null, // Ativo permanentemente até desativação manual
-        daysRemaining: found.plan === "Premium" ? 9999 : 0,
+        daysRemaining: found.plan === "Premium" ? 9999 : (trialInfo.isTrialActive ? trialInfo.trialDaysRemaining : 0),
+        isTrialActive: trialInfo.isTrialActive,
+        trialEndsAt: trialInfo.trialEndsAt,
+        trialDaysRemaining: trialInfo.trialDaysRemaining,
+        daysUsedFree: trialInfo.daysUsedFree,
+        daysSinceCreation: trialInfo.daysSinceCreation,
+        trialStatus: trialInfo.trialStatus,
+        trialTerminatedByAdmin: trialInfo.trialTerminatedByAdmin,
         payments: userPayments
       });
     } else {
+      const defaultTrialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       res.json({
         success: true,
         plan: "Free",
         isPermanent: false,
         activationDate: null,
         expirationDate: null,
-        daysRemaining: 0,
+        daysRemaining: 7,
+        isTrialActive: true,
+        trialEndsAt: defaultTrialEndsAt,
+        trialDaysRemaining: 7,
+        daysUsedFree: 0,
+        daysSinceCreation: 0,
+        trialStatus: "trial_active",
+        trialTerminatedByAdmin: false,
         payments: userPayments
       });
     }
@@ -2627,6 +2836,17 @@ app.get("/api/admin/dashboard-stats", (req, res) => {
     const premiumUsers = subs.filter(u => u.plan === "Premium").length;
     const freeUsers = subs.filter(u => u.plan !== "Premium").length;
 
+    let trialActiveCount = 0;
+    let forcedPaymentCount = 0;
+    let trialExpiredCount = 0;
+
+    subs.forEach(u => {
+      const info = getUserTrialInfo(u);
+      if (info.trialStatus === "trial_active") trialActiveCount++;
+      else if (info.trialStatus === "forced_payment") forcedPaymentCount++;
+      else if (info.trialStatus === "trial_expired") trialExpiredCount++;
+    });
+
     // Calcular faturamento total de todos os pagamentos aprovados
     let totalRevenueKz = 0;
     payments.forEach(p => {
@@ -2639,9 +2859,9 @@ app.get("/api/admin/dashboard-stats", (req, res) => {
           val = p.value;
         }
         if (val === 0) {
-          if (p.plan && p.plan.toLowerCase().includes("trimestral")) val = 15000;
-          else if (p.plan && p.plan.toLowerCase().includes("anual")) val = 50000;
-          else val = 5000;
+          if (p.plan && p.plan.toLowerCase().includes("trimestral")) val = 9000;
+          else if (p.plan && p.plan.toLowerCase().includes("anual")) val = 20000;
+          else val = 3000;
         }
         totalRevenueKz += val;
       }
@@ -2660,6 +2880,9 @@ app.get("/api/admin/dashboard-stats", (req, res) => {
         totalUsers,
         premiumUsers,
         freeUsers,
+        trialActiveCount,
+        forcedPaymentCount,
+        trialExpiredCount,
         totalRevenueKz,
         formattedTotalRevenue,
         pendingPaymentsCount,
@@ -2680,9 +2903,69 @@ app.get("/api/admin/dashboard-stats", (req, res) => {
 app.get("/api/admin/users", (req, res) => {
   try {
     const subs = loadSubscriptions();
-    res.json({ success: true, users: subs });
+    const enrichedUsers = subs.map(u => {
+      const trialInfo = getUserTrialInfo(u);
+      return {
+        ...u,
+        ...trialInfo
+      };
+    });
+    res.json({ success: true, users: enrichedUsers });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 3.5. POST /api/admin/force-payment
+// Permite ao administrador ativar a cobrança (encerrar o teste imediatamente para obrigar o usuário a pagar as assinaturas) ou reativar os 7 dias grátis
+app.post("/api/admin/force-payment", (req, res) => {
+  try {
+    const { email, forcePayment, adminEmail } = req.body;
+    const cleanEmail = email ? String(email).toLowerCase().trim() : "";
+    const cleanAdminEmail = adminEmail ? String(adminEmail).toLowerCase().trim() : "";
+
+    if (!isDeveloperEmail(cleanAdminEmail)) {
+      return res.status(403).json({ error: "Acesso restrito apenas ao administrador." });
+    }
+    if (!cleanEmail) {
+      return res.status(400).json({ error: "E-mail em falta." });
+    }
+
+    const subs = loadSubscriptions();
+    let found = subs.find(u => u.email === cleanEmail);
+    if (!found) {
+      return res.status(404).json({ error: "Utilizador não encontrado no sistema." });
+    }
+
+    const now = new Date();
+    if (forcePayment) {
+      // Bloquear teste grátis imediatamente e exigir assinatura
+      found.trialTerminatedByAdmin = true;
+      found.trialEndsAt = new Date(Date.now() - 60000).toISOString(); // Passado
+      found.plan = "Free";
+      found.updatedAt = now.toISOString();
+    } else {
+      // Reativar teste gratuito (dar 7 novos dias de teste grátis a contar de hoje)
+      found.trialTerminatedByAdmin = false;
+      found.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      found.updatedAt = now.toISOString();
+    }
+
+    saveSubscriptions(subs);
+    const trialInfo = getUserTrialInfo(found);
+
+    return res.json({
+      success: true,
+      user: {
+        ...found,
+        ...trialInfo
+      },
+      message: forcePayment
+        ? `Cobrança ativada para ${cleanEmail}! O período de teste gratuito foi encerrado e o utilizador terá de assinar um plano para aceder.`
+        : `Teste de 7 dias grátis reativado com sucesso para ${cleanEmail}!`
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -2707,8 +2990,6 @@ app.post("/api/admin/update-subscription", (req, res) => {
     let found = subs.find(u => u.email === cleanEmail);
     
     const now = new Date();
-    // Ativação do plano:
-    // Se for Premium: ativo permanentemente até desativação manual do desenvolvedor
     let activationDate: string | null = null;
     
     if (plan === "Premium") {
@@ -2720,6 +3001,9 @@ app.post("/api/admin/update-subscription", (req, res) => {
       found.activationDate = activationDate || undefined;
       found.expirationDate = undefined; // Permanente até desativação manual!
       (found as any).isPermanent = plan === "Premium";
+      if (plan === "Premium") {
+        found.trialTerminatedByAdmin = false;
+      }
       found.updatedAt = now.toISOString();
       saveSubscriptions(subs);
       res.json({ success: true, user: found, isPermanent: plan === "Premium" });
@@ -2730,6 +3014,7 @@ app.post("/api/admin/update-subscription", (req, res) => {
         plan: plan,
         activationDate: activationDate || undefined,
         expirationDate: undefined,
+        trialTerminatedByAdmin: false,
         updatedAt: now.toISOString()
       };
       (newUser as any).isPermanent = plan === "Premium";
@@ -2811,7 +3096,7 @@ app.post("/api/payment/upload-receipt", (req, res) => {
       const formattedTime = now.toLocaleTimeString("pt-AO", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       
       const plan = req.body.plan || "Plano Mensal";
-      const value = req.body.value || "5.000 Kzs";
+      const value = req.body.value || "3.000 Kzs";
       const method = req.body.method || "Transferência Bancária";
       const email = req.body.email ? String(req.body.email).toLowerCase().trim() : "chillplaces9@gmail.com";
       const name = email.split("@")[0];
@@ -3259,8 +3544,16 @@ app.post("/api/supabase/sync", async (req, res) => {
 // -------------------------------------------------------------
 
 // Rota de captura 404 para qualquer endpoint da API não registado (impede que caia no index.html do Vite)
-app.all("/api/*", (req, res) => {
-  return sendError(res, 404, "ROUTE_NOT_FOUND", `O endpoint da API [${req.method}] ${req.path} não foi encontrado.`);
+app.all(["/api/*", "/api"], (req, res) => {
+  return sendError(res, 404, "ROUTE_NOT_FOUND", `O serviço ou endpoint solicitado [${req.method}] ${req.path} não foi encontrado no servidor.`);
+});
+
+// Qualquer requisição POST/PUT/DELETE que não coincidiu recebe erro JSON 404 em vez de HTML
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return sendError(res, 404, "ENDPOINT_NOT_FOUND", `O serviço solicitado [${req.method}] ${req.path} não foi encontrado no servidor.`);
+  }
+  next();
 });
 
 // Middleware Global de Tratamento de Erros da API (garante SEMPRE resposta JSON em caso de exceções)

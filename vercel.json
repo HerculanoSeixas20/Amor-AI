@@ -6,10 +6,14 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api"
+      "destination": "/api?__path=$1"
     },
     {
-      "source": "/((?!api|assets|.*\\..*).*)",
+      "source": "/auth/callback",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api|assets|uploads|.*\\..*).*)",
       "destination": "/index.html"
     }
   ]

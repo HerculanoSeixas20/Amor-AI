@@ -22,6 +22,13 @@ export interface AuthState {
     currency?: string;
     createdAt?: string;
     lastLogin?: string;
+    trialEndsAt?: string;
+    isTrialActive?: boolean;
+    trialDaysRemaining?: number;
+    daysUsedFree?: number;
+    daysSinceCreation?: number;
+    trialStatus?: "premium" | "trial_active" | "trial_expired" | "forced_payment";
+    trialTerminatedByAdmin?: boolean;
   } | null;
   isOnboarded: boolean;
 }

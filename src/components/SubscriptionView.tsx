@@ -39,6 +39,9 @@ interface UserSubscriptionInfo {
   activationDate: string | null;
   expirationDate: string | null;
   daysRemaining: number;
+  isTrialActive?: boolean;
+  trialEndsAt?: string | null;
+  trialDaysRemaining?: number;
   payments: PaymentItem[];
 }
 
@@ -105,8 +108,8 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
       id: "mensal",
       name: "Plano Mensal",
       duration: "30 dias",
-      price: "5.000 Kz",
-      value: "5.000 Kz",
+      price: "3.000 Kz",
+      value: "3.000 Kz",
       description: "Acesso Premium durante 30 dias.",
       popular: false,
       benefits: [
@@ -121,8 +124,8 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
       id: "trimestral",
       name: "Plano Trimestral",
       duration: "90 dias",
-      price: "15.000 Kz",
-      value: "15.000 Kz",
+      price: "9.000 Kz",
+      value: "9.000 Kz",
       description: "Acesso Premium durante 90 dias.",
       popular: true,
       benefits: [
@@ -132,15 +135,15 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
         "Simuladores interativos com personas reais",
         "Avaliações e Testes de Relacionamento ilimitados",
         "Suporte preferencial via e-mail e WhatsApp",
-        "Economia de 10% em relação ao mensal"
+        "Apenas 3.000 Kz/mês (Total: 9.000 Kz)"
       ]
     },
     {
       id: "anual",
       name: "Plano Anual",
       duration: "365 dias",
-      price: "60.000 Kz",
-      value: "60.000 Kz",
+      price: "20.000 Kz",
+      value: "20.000 Kz",
       description: "Acesso Premium durante 365 dias.",
       popular: false,
       benefits: [
@@ -151,7 +154,7 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
         "Avaliações e Testes de Relacionamento ilimitados",
         "Suporte técnico prioritário 24/7",
         "Selo de Utilizador VIP com prioridade máxima",
-        "Poupe a longo prazo"
+        "Melhor oferta: Poupe 16.000 Kz em relação ao mensal"
       ]
     }
   ];
@@ -329,7 +332,7 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
           receiptFileName,
           email: activePayment.email || userEmail || "chillplaces9@gmail.com",
           plan: activePayment.plan || (selectedPlan ? selectedPlan.name : "Plano Mensal"),
-          value: activePayment.value || (selectedPlan ? selectedPlan.value : "5.000 Kzs"),
+          value: activePayment.value || (selectedPlan ? selectedPlan.value : "3.000 Kzs"),
           method: activePayment.method || "Transferência Bancária"
         })
       });
@@ -527,12 +530,26 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
             <div className="space-y-1">
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Plano Atual</span>
               <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isUserPremium ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" : "bg-slate-800 text-slate-400"}`}>
-                  {isUserPremium ? "PREMIUM VIP" : "CONTA GRATUITA"}
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                  isUserPremium 
+                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse" 
+                    : subInfo?.isTrialActive
+                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                      : "bg-red-500/10 text-red-400 border border-red-500/20"
+                }`}>
+                  {isUserPremium 
+                    ? "PREMIUM VIP" 
+                    : subInfo?.isTrialActive 
+                      ? "TESTE GRATUITO (7 DIAS)" 
+                      : "TESTE EXPIRADO"}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">
-                {isUserPremium ? "Acesso total ilimitado a todas as ferramentas." : "Acesso apenas ao Painel Geral."}
+                {isUserPremium 
+                  ? "Acesso total ilimitado a todas as ferramentas." 
+                  : subInfo?.isTrialActive
+                    ? `Período experimental de 1 semana ativo (${subInfo?.trialDaysRemaining ?? 7} dias restantes).`
+                    : "O seu teste de 7 dias terminou. Subscreva um plano para continuar a usar o Amor IA."}
               </p>
             </div>
 
@@ -576,13 +593,17 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
               <div className="flex items-center gap-1.5 text-slate-400">
                 <span className="text-slate-600">ESTADO DA CONTA:</span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                  !isUserPremium 
-                    ? "bg-[#FF3B30]/10 text-[#FF3B30] border-[#FF3B30]/20" 
-                    : (subInfo?.daysRemaining ?? 0) <= 0 
-                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
-                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                  isUserPremium 
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                    : subInfo?.isTrialActive 
+                      ? "bg-blue-500/10 text-blue-400 border-blue-500/20" 
+                      : "bg-[#FF3B30]/10 text-[#FF3B30] border-[#FF3B30]/20"
                 }`}>
-                  {!isUserPremium ? "INATIVO" : (subInfo?.daysRemaining ?? 0) <= 0 ? "EXPIRADO" : "ATIVO"}
+                  {isUserPremium 
+                    ? "PREMIUM ATIVO" 
+                    : subInfo?.isTrialActive 
+                      ? "TESTE ATIVO (7 DIAS)" 
+                      : "TESTE EXPIRADO"}
                 </span>
               </div>
             </div>

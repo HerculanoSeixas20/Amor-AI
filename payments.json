@@ -131,5 +131,62 @@
     "auditLogs": [
       "[2026-09-20T17:29:13.299Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
     ]
+  },
+  {
+    "paymentId": "PAY-N8XJU8DR2",
+    "transactionId": "TX-F7FCHZ",
+    "email": "testeproducao@gmail.com",
+    "name": "Teste Producao",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "21/09/2026",
+    "time": "12:18:26",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-21T12:18:26.481Z",
+    "updatedAt": "2026-09-21T12:18:26.481Z",
+    "auditLogs": [
+      "[2026-09-21T12:18:26.481Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-PKKCG53EK",
+    "transactionId": "TX-CABT6E",
+    "email": "testegoogle@gmail.com",
+    "name": "Google Tester",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "21/09/2026",
+    "time": "12:18:38",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-21T12:18:38.914Z",
+    "updatedAt": "2026-09-21T12:18:38.914Z",
+    "auditLogs": [
+      "[2026-09-21T12:18:38.914Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-M8MDVG2R6",
+    "transactionId": "TX-L89X74",
+    "email": "novo.usuario.teste@gmail.com",
+    "name": "Novo Usuario",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "21/09/2026",
+    "time": "12:26:09",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-09-21T12:26:09.440Z",
+    "updatedAt": "2026-09-21T12:26:09.440Z",
+    "auditLogs": [
+      "[2026-09-21T12:26:09.440Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
   }
 ]
