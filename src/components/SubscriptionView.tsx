@@ -540,7 +540,7 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
                   {isUserPremium 
                     ? "PREMIUM VIP" 
                     : subInfo?.isTrialActive 
-                      ? "TESTE GRATUITO (7 DIAS)" 
+                      ? "TESTE GRATUITO (3 DIAS)" 
                       : "TESTE EXPIRADO"}
                 </span>
               </div>
@@ -548,8 +548,8 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
                 {isUserPremium 
                   ? "Acesso total ilimitado a todas as ferramentas." 
                   : subInfo?.isTrialActive
-                    ? `Período experimental de 1 semana ativo (${subInfo?.trialDaysRemaining ?? 7} dias restantes).`
-                    : "O seu teste de 7 dias terminou. Subscreva um plano para continuar a usar o Amor IA."}
+                    ? `Período experimental de 3 dias ativo (${subInfo?.trialDaysRemaining ?? 3} dias restantes).`
+                    : "O seu teste de 3 dias terminou. Subscreva um plano para continuar a usar o Amor IA."}
               </p>
             </div>
 
@@ -602,7 +602,7 @@ export default function SubscriptionView({ currentPlan, userEmail, onUpgrade, on
                   {isUserPremium 
                     ? "PREMIUM ATIVO" 
                     : subInfo?.isTrialActive 
-                      ? "TESTE ATIVO (7 DIAS)" 
+                      ? "TESTE ATIVO (3 DIAS)" 
                       : "TESTE EXPIRADO"}
                 </span>
               </div>

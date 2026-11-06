@@ -3,9 +3,9 @@
     "email": "chillplaces9@gmail.com",
     "name": "Mário",
     "plan": "Premium",
-    "password": "admin",
-    "updatedAt": "2026-09-20T17:02:35.407Z",
-    "lastLogin": "2026-09-20T17:02:35.407Z",
+    "password": "123",
+    "updatedAt": "2026-11-06T15:15:23.503Z",
+    "lastLogin": "2026-11-06T15:15:23.503Z",
     "avatar": "https://lh3.googleusercontent.com/a/default",
     "provider": "Google",
     "country": "Angola",
@@ -18,8 +18,10 @@
       "2026-09-20T16:58:53.098Z",
       "2026-09-20T17:00:50.754Z",
       "2026-09-20T17:02:35.388Z",
-      "2026-09-20T17:02:35.407Z"
-    ]
+      "2026-09-20T17:02:35.407Z",
+      "2026-11-06T15:15:23.503Z"
+    ],
+    "trialEndsAt": "2026-11-09T15:15:23.503Z"
   },
   {
     "email": "cliente@amoria.com",
@@ -240,5 +242,26 @@
     "country": "Angola",
     "language": "Português",
     "currency": "AOA"
+  },
+  {
+    "email": "teste.tresdias@gmail.com",
+    "name": "Cliente 3 Dias",
+    "plan": "Premium",
+    "password": "senhaSegura123",
+    "sessions": [
+      "2026-11-06T15:15:18.907Z"
+    ],
+    "updatedAt": "2026-11-06T15:15:33.869Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Email",
+    "createdAt": "2026-11-06T15:15:18.907Z",
+    "lastLogin": "2026-11-06T15:15:18.907Z",
+    "trialEndsAt": "2026-11-06T15:14:30.388Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA",
+    "trialTerminatedByAdmin": true,
+    "activationDate": "2026-11-06T15:15:33.869Z",
+    "isPermanent": true
   }
 ]

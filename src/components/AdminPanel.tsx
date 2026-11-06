@@ -678,9 +678,9 @@ export default function AdminPanel() {
                           ? user.daysSinceCreation 
                           : Math.floor(Math.max(0, Date.now() - createdTimestamp) / (1000 * 60 * 60 * 24));
                         
-                        const daysUsed = typeof user.daysUsedFree === "number" ? user.daysUsedFree : Math.min(daysSinceSignup, 7);
-                        const daysRemaining = typeof user.trialDaysRemaining === "number" ? user.trialDaysRemaining : Math.max(0, 7 - daysUsed);
-                        const progressPct = Math.min(100, Math.max(8, Math.round((daysUsed / 7) * 100)));
+                        const daysUsed = typeof user.daysUsedFree === "number" ? user.daysUsedFree : Math.min(daysSinceSignup, 3);
+                        const daysRemaining = typeof user.trialDaysRemaining === "number" ? user.trialDaysRemaining : Math.max(0, 3 - daysUsed);
+                        const progressPct = Math.min(100, Math.max(8, Math.round((daysUsed / 3) * 100)));
 
                         const formattedCreationDate = new Date(createdTimestamp).toLocaleDateString("pt-AO", {
                           day: "2-digit",
@@ -752,17 +752,17 @@ export default function AdminPanel() {
                                     Teste gratuito encerrado manualmente. O utilizador está <strong>bloqueado</strong> e é obrigado a pagar a assinatura para entrar.
                                   </p>
                                   <span className="text-[9px] text-slate-400 block font-mono">
-                                    Usou {daysUsed} de 7 dias antes do encerramento.
+                                    Usou {daysUsed} de 3 dias antes do encerramento.
                                   </span>
                                 </div>
                               ) : isTrialExpired ? (
                                 <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-2.5 space-y-1.5">
                                   <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
                                     <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-                                    7 de 7 Dias Grátis Usados (Expirado)
+                                    3 de 3 Dias Grátis Usados (Expirado)
                                   </span>
                                   <p className="text-[10px] text-slate-400 leading-tight">
-                                    O período de teste de 1 semana terminou naturalmente. A tela de pagamento está ativa no app.
+                                    O período de teste de 3 dias terminou naturalmente. A tela de pagamento está ativa no app.
                                   </p>
                                 </div>
                               ) : (
@@ -770,20 +770,20 @@ export default function AdminPanel() {
                                   <div className="flex justify-between items-center text-[11px]">
                                     <span className="text-white font-bold flex items-center gap-1">
                                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                                      {daysUsed} de 7 dias grátis usados
+                                      {daysUsed} de 3 dias grátis usados
                                     </span>
                                     <span className="text-cyan-400 font-bold font-mono">
                                       {progressPct}%
                                     </span>
                                   </div>
 
-                                  {/* Barra de Progresso Visual dos 7 dias */}
+                                  {/* Barra de Progresso Visual dos 3 dias */}
                                   <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
                                     <div 
                                       className={`h-full rounded-full transition-all duration-500 ${
-                                        daysUsed >= 6 
+                                        daysUsed >= 3 
                                           ? "bg-rose-500" 
-                                          : daysUsed >= 4 
+                                          : daysUsed >= 2 
                                             ? "bg-amber-500" 
                                             : "bg-emerald-500"
                                       }`}
@@ -797,7 +797,7 @@ export default function AdminPanel() {
                                       Restam {daysRemaining} dia{daysRemaining !== 1 ? "s" : ""} de teste
                                     </span>
                                     <span className="text-[9px] text-slate-500 font-mono">
-                                      Limite: 7 dias
+                                      Limite: 3 dias
                                     </span>
                                   </div>
                                 </div>
@@ -833,7 +833,7 @@ export default function AdminPanel() {
                             <td className="p-3.5 align-top text-right min-w-[210px]">
                               <div className="flex flex-col items-end gap-2">
                                 
-                                {/* BOTÃO 1: ATIVAR COBRANÇA (EXIGIR PAGAMENTO) OU REATIVAR 7 DIAS GRÁTIS */}
+                                {/* BOTÃO 1: ATIVAR COBRANÇA (EXIGIR PAGAMENTO) OU REATIVAR 3 DIAS GRÁTIS */}
                                 {!isPremium && (
                                   !isForcedPayment ? (
                                     <button
@@ -850,10 +850,10 @@ export default function AdminPanel() {
                                       type="button"
                                       onClick={() => handleForcePayment(user.email, false)}
                                       className="w-full sm:w-auto py-2 px-3 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center sm:justify-start gap-1.5"
-                                      title="Devolver 7 dias de teste gratuito a este utilizador"
+                                      title="Devolver 3 dias de teste gratuito a este utilizador"
                                     >
                                       <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
-                                      <span>Reativar 7 Dias Grátis</span>
+                                      <span>Reativar 3 Dias Grátis</span>
                                     </button>
                                   )
                                 )}

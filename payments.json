@@ -188,5 +188,27 @@
     "auditLogs": [
       "[2026-09-21T12:26:09.440Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
     ]
+  },
+  {
+    "paymentId": "PAY-Z1PLCUBQ8",
+    "transactionId": "TX-7E10RD",
+    "email": "teste.tresdias@gmail.com",
+    "name": "Cliente 3 Dias",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "06/11/2026",
+    "time": "15:15:18",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "approved",
+    "createdAt": "2026-11-06T15:15:18.907Z",
+    "updatedAt": "2026-11-06T15:15:33.869Z",
+    "auditLogs": [
+      "[2026-11-06T15:15:18.907Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador.",
+      "[2026-11-06T15:15:33.869Z] Pagamento aprovado por chillplaces9@gmail.com. Subscrição Premium ativada de forma PERMANENTE até desativação manual."
+    ],
+    "activationDate": "2026-11-06T15:15:33.869Z",
+    "isPermanent": true
   }
 ]

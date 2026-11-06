@@ -1976,7 +1976,7 @@ function getUserTrialInfo(user: SavedUser): {
       isTrialActive: false,
       trialEndsAt: user.trialEndsAt || new Date(0).toISOString(),
       trialDaysRemaining: 0,
-      daysUsedFree: Math.max(1, Math.min(daysSinceCreation, 7)),
+      daysUsedFree: Math.max(1, Math.min(daysSinceCreation, 3)),
       daysSinceCreation,
       trialStatus: "forced_payment",
       trialTerminatedByAdmin: true
@@ -1986,9 +1986,9 @@ function getUserTrialInfo(user: SavedUser): {
   let trialEndsAt = user.trialEndsAt;
   if (!trialEndsAt) {
     if (user.createdAt) {
-      trialEndsAt = new Date(createdTime + 7 * 24 * 60 * 60 * 1000).toISOString();
+      trialEndsAt = new Date(createdTime + 3 * 24 * 60 * 60 * 1000).toISOString();
     } else {
-      trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
     }
   }
 
@@ -1997,14 +1997,14 @@ function getUserTrialInfo(user: SavedUser): {
   const isTrialActive = now < endTime;
   const trialDaysRemaining = isTrialActive ? Math.max(1, Math.ceil((endTime - now) / (1000 * 60 * 60 * 24))) : 0;
   
-  // Quantos dias já usou de graça:
-  const daysUsed = Math.min(Math.max(daysSinceCreation, 7 - trialDaysRemaining), 7);
+  // Quantos dias já usou de graça (máximo de 3 dias de avaliação):
+  const daysUsed = Math.min(Math.max(daysSinceCreation, 3 - trialDaysRemaining), 3);
 
   return {
     isTrialActive,
     trialEndsAt,
     trialDaysRemaining,
-    daysUsedFree: isTrialActive ? daysUsed : 7,
+    daysUsedFree: isTrialActive ? daysUsed : 3,
     daysSinceCreation,
     trialStatus: isTrialActive ? "trial_active" : "trial_expired",
     trialTerminatedByAdmin: false
@@ -2302,7 +2302,7 @@ const handleRegisterUser = (req: express.Request, res: express.Response) => {
     let isNewUser = false;
     if (!existing) {
       isNewUser = true;
-      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       existing = {
         email: cleanEmail,
         name: (name && String(name).trim()) || cleanEmail.split("@")[0],
@@ -2329,9 +2329,9 @@ const handleRegisterUser = (req: express.Request, res: express.Response) => {
 
       if (!existing.trialEndsAt) {
         if (existing.createdAt) {
-          existing.trialEndsAt = new Date(new Date(existing.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          existing.trialEndsAt = new Date(new Date(existing.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
         } else {
-          existing.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          existing.trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
         }
       }
 
@@ -2403,7 +2403,7 @@ const handleGoogleAuth = (req: express.Request, res: express.Response) => {
     let isNew = false;
     if (!existing) {
       isNew = true;
-      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       existing = {
         email: cleanEmail,
         name: (name && String(name).trim()) || cleanEmail.split("@")[0],
@@ -2425,9 +2425,9 @@ const handleGoogleAuth = (req: express.Request, res: express.Response) => {
     } else {
       if (!existing.trialEndsAt) {
         if (existing.createdAt) {
-          existing.trialEndsAt = new Date(new Date(existing.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          existing.trialEndsAt = new Date(new Date(existing.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
         } else {
-          existing.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          existing.trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
         }
       }
       if (name && String(name).trim()) existing.name = String(name).trim();
@@ -2497,7 +2497,7 @@ const handleLoginUser = (req: express.Request, res: express.Response) => {
     // Se o utilizador ainda não existe, cria a conta automaticamente para nunca bloquear o login com erro de utilizador não encontrado
     if (!found) {
       const defaultName = cleanEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, l => l.toUpperCase());
-      const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       found = {
         email: cleanEmail,
         name: defaultName,
@@ -2536,9 +2536,9 @@ const handleLoginUser = (req: express.Request, res: express.Response) => {
     // Garantir trialEndsAt
     if (!found.trialEndsAt) {
       if (found.createdAt) {
-        found.trialEndsAt = new Date(new Date(found.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        found.trialEndsAt = new Date(new Date(found.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
       } else {
-        found.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        found.trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       }
     }
 
@@ -2798,17 +2798,17 @@ app.get("/api/user-subscription", (req, res) => {
         payments: userPayments
       });
     } else {
-      const defaultTrialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const defaultTrialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       res.json({
         success: true,
         plan: "Free",
         isPermanent: false,
         activationDate: null,
         expirationDate: null,
-        daysRemaining: 7,
+        daysRemaining: 3,
         isTrialActive: true,
         trialEndsAt: defaultTrialEndsAt,
-        trialDaysRemaining: 7,
+        trialDaysRemaining: 3,
         daysUsedFree: 0,
         daysSinceCreation: 0,
         trialStatus: "trial_active",
@@ -2945,9 +2945,9 @@ app.post("/api/admin/force-payment", (req, res) => {
       found.plan = "Free";
       found.updatedAt = now.toISOString();
     } else {
-      // Reativar teste gratuito (dar 7 novos dias de teste grátis a contar de hoje)
+      // Reativar teste gratuito (dar 3 novos dias de teste grátis a contar de hoje)
       found.trialTerminatedByAdmin = false;
-      found.trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      found.trialEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
       found.updatedAt = now.toISOString();
     }
 
@@ -2962,7 +2962,7 @@ app.post("/api/admin/force-payment", (req, res) => {
       },
       message: forcePayment
         ? `Cobrança ativada para ${cleanEmail}! O período de teste gratuito foi encerrado e o utilizador terá de assinar um plano para aceder.`
-        : `Teste de 7 dias grátis reativado com sucesso para ${cleanEmail}!`
+        : `Teste de 3 dias grátis reativado com sucesso para ${cleanEmail}!`
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

@@ -446,7 +446,7 @@ export default function App() {
   const isUserPremium = authState.user?.plan === "Premium";
   const isAdmin = authState.user?.email === "chillplaces9@gmail.com" || authState.user?.email === "chiilplaces9@gmail.com";
 
-  // Período de Avaliação Gratuita de 1 semana (7 dias) na primeira vez que o usuário entra no app
+  // Período de Avaliação Gratuita de 3 dias na primeira vez que o usuário entra no app
   // Se o administrador tiver forçado a cobrança ou o teste tiver expirado, isTrialActive é false
   const isTrialActive = Boolean(
     !isUserPremium && !isAdmin && 
@@ -461,15 +461,15 @@ export default function App() {
 
   const trialEndsAtDate = authState.user?.trialEndsAt 
     ? new Date(authState.user.trialEndsAt) 
-    : (authState.user?.createdAt ? new Date(new Date(authState.user.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000) : null);
+    : (authState.user?.createdAt ? new Date(new Date(authState.user.createdAt).getTime() + 3 * 24 * 60 * 60 * 1000) : null);
 
   const trialDaysRemaining = typeof authState.user?.trialDaysRemaining === "number" && authState.user.trialDaysRemaining > 0
     ? authState.user.trialDaysRemaining
-    : (trialEndsAtDate ? Math.max(1, Math.ceil((trialEndsAtDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 7);
+    : (trialEndsAtDate ? Math.max(1, Math.ceil((trialEndsAtDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 3);
 
   const hasAccess = isUserPremium || isAdmin || isTrialActive;
 
-  // SE NÃO FOR PREMIUM, NÃO FOR ADMIN E O PERÍODO DE TESTE DE 7 DIAS JÁ TIVER TERMINADO OU COBRANÇA FORÇADA:
+  // SE NÃO FOR PREMIUM, NÃO FOR ADMIN E O PERÍODO DE TESTE DE 3 DIAS JÁ TIVER TERMINADO OU COBRANÇA FORÇADA:
   // BLOQUEIA COMPLETAMENTE O ACESSO E PEDE PARA PAGAR AS ASSINATURAS
   if (!hasAccess) {
     const isForcedPayment = authState.user?.trialTerminatedByAdmin;
@@ -487,16 +487,16 @@ export default function App() {
               <Sparkles className="w-8 h-8 fill-amber-400" />
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white font-display flex items-center justify-center gap-2">
-              {isForcedPayment ? "Ativação de Assinatura Obrigatória" : "O Seu Teste de 1 Semana Expirou"}
+              {isForcedPayment ? "Ativação de Assinatura Obrigatória" : "O Seu Teste de 3 Dias Expirou"}
             </h1>
             <p className="text-sm text-slate-400 max-w-xl mx-auto">
               {isForcedPayment ? (
                 <>
-                  Olá, <strong className="text-white">{authState.user?.name}</strong>! O <strong>Amor IA</strong> é um aplicativo pago. O acesso gratuito de demonstração foi concluído. Para continuar a transformar o seu relacionamento e aceder a todas as funcionalidades inteligentes, ative uma das nossas assinaturas:
+                  Olá, <strong className="text-white">{authState.user?.name}</strong>! O <strong>Amor IA</strong> é um aplicativo pago. O acesso gratuito de demonstração foi concluído pelo administrador. Para continuar a transformar o seu relacionamento e aceder a todas as funcionalidades inteligentes, ative uma das nossas assinaturas:
                 </>
               ) : (
                 <>
-                  Olá, <strong className="text-white">{authState.user?.name}</strong>! O <strong>Amor IA</strong> é um aplicativo pago. O seu período experimental gratuito de 7 dias chegou ao fim. Para continuar a transformar o seu relacionamento e aceder a todas as funcionalidades exclusivas, ative uma das nossas assinaturas:
+                  Olá, <strong className="text-white">{authState.user?.name}</strong>! O <strong>Amor IA</strong> é um aplicativo pago. O seu período experimental gratuito de 3 dias chegou ao fim. Para continuar a transformar o seu relacionamento e aceder a todas as funcionalidades exclusivas, ative uma das nossas assinaturas:
                 </>
               )}
             </p>
@@ -562,7 +562,7 @@ export default function App() {
           <div className="bg-[#9E1B1B]/15 border border-[#9E1B1B]/30 rounded-3xl p-6 text-center space-y-3 max-w-2xl mx-auto">
             <h2 className="text-lg font-bold text-white font-display">Período de Teste Expirado</h2>
             <p className="text-xs text-slate-400">
-              O seu período de teste de 7 dias expirou. O módulo avançado <strong className="text-[#FF3B30] uppercase">"{currentModule}"</strong> requer uma subscrição ativa de membro VIP Premium.
+              O seu período de teste de 3 dias expirou. O módulo avançado <strong className="text-[#FF3B30] uppercase">"{currentModule}"</strong> requer uma subscrição ativa de membro VIP Premium.
             </p>
           </div>
           <SubscriptionView
@@ -656,7 +656,7 @@ export default function App() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                    Período de Teste de 1 Semana Ativo
+                    Período de Teste de 3 Dias Ativo
                   </h4>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">
                     {trialDaysRemaining} {trialDaysRemaining === 1 ? "dia restante" : "dias restantes"}

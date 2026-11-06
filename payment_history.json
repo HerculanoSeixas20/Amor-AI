@@ -68,5 +68,19 @@
     "event": "Comprovativo enviado automaticamente por interação do utilizador",
     "user": "novo.usuario.teste@gmail.com",
     "timestamp": "2026-09-21T12:26:09.456Z"
+  },
+  {
+    "id": "H-IO63L44RB",
+    "paymentId": "PAY-Z1PLCUBQ8",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "teste.tresdias@gmail.com",
+    "timestamp": "2026-11-06T15:15:18.923Z"
+  },
+  {
+    "id": "H-UX9U6QR1E",
+    "paymentId": "PAY-Z1PLCUBQ8",
+    "event": "Pagamento aprovado. Subscrição Premium ativada de forma PERMANENTE pelo Administrador.",
+    "user": "chillplaces9@gmail.com",
+    "timestamp": "2026-11-06T15:15:33.870Z"
   }
 ]
