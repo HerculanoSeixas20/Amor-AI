@@ -3600,8 +3600,22 @@ async function bootstrap() {
   });
 }
 
-// Iniciar servidor express apenas fora do ambiente serverless (na Vercel, o handler em /api gere as requisições)
-if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+// Iniciar servidor express apenas no ambiente standalone (fora de funções serverless da Vercel / AWS)
+const isServerlessEnv = Boolean(
+  process.env.VERCEL ||
+  process.env.VERCEL_ENV ||
+  process.env.NOW_REGION ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT
+);
+
+const isDirectEntry = typeof process !== "undefined" && process.argv && process.argv[1] && (
+  process.argv[1].endsWith("server.ts") ||
+  process.argv[1].endsWith("server.cjs") ||
+  process.argv[1].endsWith("server.js")
+);
+
+if (!isServerlessEnv && (isDirectEntry || process.env.NODE_ENV !== "production")) {
   bootstrap().catch((err) => {
     console.error("Erro ao inicializar o servidor:", err);
   });

@@ -1,15 +1,40 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import app from "../server";
+import app from "../server.ts";
 
 /**
  * Serverless Function explícita para /api/register-user na Vercel.
- * Garante que a rota de registo nunca resulte em 404 HTML da Vercel.
+ * Garante que a rota de registo nunca resulte em 404 HTML da Vercel nem FUNCTION_INVOCATION_FAILED.
  */
 export default function handler(req: IncomingMessage, res: ServerResponse) {
-  const customReq = req as any;
-  customReq.url = "/api/register-user";
-  if (customReq.body !== undefined && !customReq._body) {
-    customReq._body = true;
-  }
-  return app(customReq, res);
+  return new Promise((resolve) => {
+    res.on("finish", resolve);
+    res.on("close", resolve);
+
+    try {
+      const customReq = req as any;
+      customReq.url = "/api/register-user";
+      
+      // Suporte seguro a corpo JSON já processado pelo runtime da Vercel
+      if (customReq.body !== undefined && !customReq._body) {
+        customReq._body = true;
+      }
+
+      app(customReq, res);
+    } catch (err: any) {
+      console.error("[Vercel /api/register-user Error]:", err);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify({
+          success: false,
+          error: {
+            code: "SERVERLESS_FUNCTION_ERROR",
+            message: "Ocorreu um erro ao processar o registo. Por favor, tente novamente."
+          },
+          message: "Ocorreu um erro ao processar o registo. Por favor, tente novamente."
+        }));
+      }
+      resolve(null);
+    }
+  });
 }

@@ -210,5 +210,62 @@
     ],
     "activationDate": "2026-11-06T15:15:33.869Z",
     "isPermanent": true
+  },
+  {
+    "paymentId": "PAY-WVDHNTRH2",
+    "transactionId": "TX-Y6SULD",
+    "email": "test@example.com",
+    "name": "Test",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "06/11/2026",
+    "time": "16:55:34",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-11-06T16:55:34.239Z",
+    "updatedAt": "2026-11-06T16:55:34.239Z",
+    "auditLogs": [
+      "[2026-11-06T16:55:34.239Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-RNPGN743I",
+    "transactionId": "TX-R3OXFT",
+    "email": "test_new@example.com",
+    "name": "Test New",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "06/11/2026",
+    "time": "16:58:41",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-11-06T16:58:41.627Z",
+    "updatedAt": "2026-11-06T16:58:41.627Z",
+    "auditLogs": [
+      "[2026-11-06T16:58:41.627Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
+  },
+  {
+    "paymentId": "PAY-Z23EL808R",
+    "transactionId": "TX-2ZIWGT",
+    "email": "teste_amor_ia_2026@gmail.com",
+    "name": "Utilizador Teste",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "06/11/2026",
+    "time": "17:02:32",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-11-06T17:02:32.926Z",
+    "updatedAt": "2026-11-06T17:02:32.926Z",
+    "auditLogs": [
+      "[2026-11-06T17:02:32.926Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
   }
 ]

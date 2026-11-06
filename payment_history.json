@@ -82,5 +82,26 @@
     "event": "Pagamento aprovado. Subscrição Premium ativada de forma PERMANENTE pelo Administrador.",
     "user": "chillplaces9@gmail.com",
     "timestamp": "2026-11-06T15:15:33.870Z"
+  },
+  {
+    "id": "H-3YPIT22ID",
+    "paymentId": "PAY-WVDHNTRH2",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "test@example.com",
+    "timestamp": "2026-11-06T16:55:34.252Z"
+  },
+  {
+    "id": "H-5M50I12GB",
+    "paymentId": "PAY-RNPGN743I",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "test_new@example.com",
+    "timestamp": "2026-11-06T16:58:41.645Z"
+  },
+  {
+    "id": "H-WOA80E5E2",
+    "paymentId": "PAY-Z23EL808R",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "teste_amor_ia_2026@gmail.com",
+    "timestamp": "2026-11-06T17:02:32.939Z"
   }
 ]

@@ -103,8 +103,21 @@ export async function apiRequest<T = any>(
   const isJsonHeader = contentType.includes("application/json");
   const looksLikeJson = (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
 
-  // 2. Se a resposta NÃO for JSON (ex: HTML de erro de servidor, página 404 Vercel, 502 Bad Gateway)
-  if (!isJsonHeader || !looksLikeJson) {
+  let data: any = null;
+  let parseSucceeded = false;
+
+  // Tentar parsear como JSON se tiver cabeçalho JSON ou formato JSON
+  if (isJsonHeader || looksLikeJson || (trimmed.startsWith("{") || trimmed.startsWith("["))) {
+    try {
+      data = JSON.parse(trimmed);
+      parseSucceeded = true;
+    } catch {
+      parseSucceeded = false;
+    }
+  }
+
+  // 2. Se NÃO conseguimos obter JSON válido da resposta
+  if (!parseSucceeded) {
     const preview = trimmed.substring(0, 160);
     console.warn(`[API Non-JSON Response] ${endpoint} Status: ${response.status} (ReqID: ${responseReqId}):`, preview);
 
@@ -113,41 +126,32 @@ export async function apiRequest<T = any>(
     if (response.status === 404) {
       friendlyMessage = "O serviço solicitado não foi encontrado no servidor (404).";
     } else if (response.status === 409) {
-      friendlyMessage = "Este e-mail já se encontra registado. Aceda com a sua palavra-passe.";
+      friendlyMessage = "Este e-mail já se encontra registado. Inicie sessão com a sua palavra-passe.";
+    } else if (response.status === 401 || response.status === 403) {
+      friendlyMessage = "Acesso não autorizado ou credenciais incorretas.";
+    } else if (response.status >= 500) {
+      if (preview.includes("FUNCTION_INVOCATION_FAILED") || preview.toLowerCase().includes("serverless")) {
+        friendlyMessage = "Erro temporário de execução na infraestrutura da API. Por favor, tente novamente em alguns segundos.";
+      } else {
+        friendlyMessage = "O servidor encontrou um problema temporário (500). Por favor, tente novamente.";
+      }
     } else if (response.status === 502 || response.status === 503 || response.status === 504) {
       friendlyMessage = "Serviço temporariamente indisponível. Estamos a restabelecer a ligação.";
-    } else if (response.status === 401 || response.status === 403) {
-      friendlyMessage = "Acesso não autorizado ou sessão expirada. Por favor, inicie sessão.";
     } else if (preview.toLowerCase().includes("the page") || preview.toLowerCase().includes("cannot be found") || preview.toLowerCase().includes("not found")) {
-      friendlyMessage = "O serviço solicitado está temporariamente indisponível na infraestrutura de produção. Tente novamente em instantes.";
+      friendlyMessage = "O serviço solicitado está temporariamente indisponível na infraestrutura. Tente novamente em instantes.";
     }
 
     throw new ApiError(
       friendlyMessage,
-      response.status === 409 ? "ACCOUNT_EXISTS" : "INVALID_CONTENT_TYPE",
+      response.status === 409 ? "ACCOUNT_EXISTS" : (response.status >= 500 ? "SERVER_ERROR" : "INVALID_RESPONSE"),
       response.status,
       responseReqId,
       { rawPreview: preview }
     );
   }
 
-  // 3. Tentar parsear o JSON com proteção total
-  let data: any;
-  try {
-    data = JSON.parse(rawText);
-  } catch (jsonErr: any) {
-    console.warn(`[API JSON Parse Error] ${endpoint} (ReqID: ${responseReqId}):`, jsonErr);
-    throw new ApiError(
-      "Resposta do servidor em formato inválido. Tente novamente.",
-      "JSON_PARSE_ERROR",
-      response.status,
-      responseReqId,
-      { rawPreview: trimmed.substring(0, 100) }
-    );
-  }
-
-  // Se o status HTTP indicar erro (não 2xx)
-  if (!response.ok) {
+  // 3. Se o status HTTP indicar erro (não 2xx) ou se a resposta contiver { success: false }
+  if (!response.ok || (data && typeof data === "object" && data.success === false && !options.headers?.hasOwnProperty("ignore-success-false"))) {
     let errorMessage = "Ocorreu um erro ao processar a operação.";
     let errorCode = `HTTP_${response.status}`;
 
@@ -163,7 +167,7 @@ export async function apiRequest<T = any>(
     }
 
     // Tratamento específico de status comuns
-    if (response.status === 409 && errorCode === `HTTP_409`) {
+    if ((response.status === 409 || errorCode === "USER_EXISTS" || errorCode === "ACCOUNT_EXISTS") && errorCode !== "ACCOUNT_EXISTS") {
       errorCode = "ACCOUNT_EXISTS";
     }
 
