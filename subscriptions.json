@@ -319,5 +319,24 @@
     "country": "Angola",
     "language": "Português",
     "currency": "AOA"
+  },
+  {
+    "email": "mario_teste_supabase@gmail.com",
+    "name": "Mário Supabase",
+    "plan": "Free",
+    "password": "password123",
+    "sessions": [
+      "2026-11-06T17:11:07.411Z",
+      "2026-11-06T17:11:10.981Z"
+    ],
+    "updatedAt": "2026-11-06T17:11:10.981Z",
+    "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+    "provider": "Email",
+    "createdAt": "2026-11-06T17:11:07.411Z",
+    "lastLogin": "2026-11-06T17:11:10.981Z",
+    "trialEndsAt": "2026-11-09T17:11:07.411Z",
+    "country": "Angola",
+    "language": "Português",
+    "currency": "AOA"
   }
 ]

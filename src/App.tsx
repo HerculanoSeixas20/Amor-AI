@@ -27,7 +27,14 @@ import {
 import { Crown, HelpCircle, Activity, Sparkles, LogOut, Check, Heart, MessageSquare, Compass, Zap, Database, Plus, X, ShieldAlert, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { apiRequest } from "./lib/apiClient";
-import { isSupabaseConfigured, handleAuthCallback } from "./lib/supabase";
+import { 
+  isSupabaseConfigured, 
+  handleAuthCallback, 
+  getSupabaseSession, 
+  onSupabaseAuthStateChange, 
+  signOutSupabase, 
+  syncRuntimeSupabaseConfig 
+} from "./lib/supabase";
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>({
@@ -41,9 +48,52 @@ export default function App() {
   const [isVipModalOpen, setIsVipModalOpen] = useState(false);
   const [isFloatingMenuOpen, setIsFloatingMenuOpen] = useState(false);
 
-  // Sync state with simulated local session or OAuth redirect callback
+  // Sincronização do estado de autenticação com Supabase Auth e sessão local
   useEffect(() => {
-    // 1. Verificar se estamos num callback do Supabase / Google OAuth
+    let isMounted = true;
+
+    // 1. Iniciar sincronização dinâmica de variáveis Supabase se necessário
+    syncRuntimeSupabaseConfig().then(() => {
+      if (!isMounted) return;
+
+      // 2. Verificar se há sessão ativa no Supabase Auth
+      if (isSupabaseConfigured()) {
+        getSupabaseSession().then(({ session, user }) => {
+          if (!isMounted) return;
+          if (session && user?.email) {
+            const email = user.email.toLowerCase().trim();
+            const name = user.user_metadata?.full_name || user.user_metadata?.name || email.split("@")[0] || "Utilizador";
+            const initialPlan: "Free" | "Premium" = email === "chillplaces9@gmail.com" ? "Premium" : "Free";
+            
+            handleLoginSuccess(email, name, initialPlan, {
+              avatar: user.user_metadata?.avatar_url,
+              provider: "Supabase"
+            });
+          }
+        });
+      }
+    });
+
+    // 3. Subscrever a alterações de estado de autenticação no Supabase (onAuthStateChange)
+    const { unsubscribe } = onSupabaseAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      if (event === "SIGNED_OUT") {
+        setAuthState({ user: null, isAuthenticated: false, loading: false });
+        setUserProfile(null);
+        localStorage.removeItem("amor_ia_user");
+        localStorage.removeItem("amor_ia_profile");
+      } else if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user?.email) {
+        const email = session.user.email.toLowerCase().trim();
+        const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || email.split("@")[0] || "Utilizador";
+        const initialPlan: "Free" | "Premium" = email === "chillplaces9@gmail.com" ? "Premium" : "Free";
+        handleLoginSuccess(email, name, initialPlan, {
+          avatar: session.user.user_metadata?.avatar_url,
+          provider: "Supabase"
+        });
+      }
+    });
+
+    // 4. Verificar se estamos num callback do Supabase / Google OAuth
     const isCallback = 
       window.location.pathname.includes("/auth/callback") || 
       window.location.hash.includes("access_token=") || 
@@ -62,7 +112,10 @@ export default function App() {
           window.history.replaceState({}, document.title, "/");
         }
       });
-      return;
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
     }
 
     const savedUserStr = localStorage.getItem("amor_ia_user");
@@ -88,7 +141,6 @@ export default function App() {
     }
 
     if (parsedUser) {
-      // Carregar instantaneamente a sessão local para carregar o ecrã rapidamente
       setAuthState({
         user: parsedUser,
         isAuthenticated: true,
@@ -99,9 +151,9 @@ export default function App() {
         setUserProfile(parsedProfile);
       }
 
-      // Sincronizar assinatura real do servidor de forma assíncrona
       apiRequest<{ success: boolean; plan?: "Free" | "Premium" }>(`/api/user-subscription?email=${encodeURIComponent(parsedUser.email)}`)
         .then(data => {
+          if (!isMounted) return;
           if (data && data.success && data.plan) {
             const updatedUser = { ...parsedUser, plan: data.plan };
             localStorage.setItem("amor_ia_user", JSON.stringify(updatedUser));
@@ -124,6 +176,11 @@ export default function App() {
         setUserProfile(parsedProfile);
       }
     }
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const handleLoginSuccess = (emailOrUser: any, name?: string, plan?: "Free" | "Premium", extraFields?: any) => {
@@ -266,6 +323,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    signOutSupabase().catch(() => {});
     localStorage.removeItem("amor_ia_user");
     localStorage.removeItem("amor_ia_profile");
     setAuthState({

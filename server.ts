@@ -3346,6 +3346,19 @@ app.get("/api/integrations/status", (req, res) => {
   });
 });
 
+app.get("/api/auth/config", (req, res) => {
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  res.json({
+    success: true,
+    supabase: {
+      configured: Boolean(url && anonKey && url.includes("supabase.co")),
+      url,
+      anonKey
+    }
+  });
+});
+
 app.post("/api/openai/test", async (req, res) => {
   try {
     const { prompt } = req.body;

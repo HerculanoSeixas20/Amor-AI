@@ -4,9 +4,21 @@ import {
   AlertCircle, Clock, Key, Sun, Moon, Shield
 } from "lucide-react";
 import { apiRequest, ApiError } from "../lib/apiClient";
+import { 
+  isSupabaseConfigured, 
+  signUpWithSupabase, 
+  signInWithSupabase, 
+  syncRuntimeSupabaseConfig 
+} from "../lib/supabase";
 
 interface LoginProps {
   onLoginSuccess: (email: string, name: string, plan: "Free" | "Premium") => void;
+}
+
+function cleanNameFallback(email: string): string {
+  if (!email) return "Utilizador";
+  const prefix = email.split("@")[0] || "Utilizador";
+  return prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 
 // Destaques rotativos sobre a plataforma Amor IA
@@ -61,6 +73,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   });
 
   useEffect(() => {
+    syncRuntimeSupabaseConfig().catch(() => {});
     const saved = localStorage.getItem("amor_ia_theme");
     if (saved === "light") {
       document.body.classList.add("theme-light");
@@ -188,6 +201,65 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
 
       setIsLoading(true);
+
+      // Prioridade 1: Se o Supabase estiver configurado, utilizar supabase.auth.signUp()
+      if (isSupabaseConfigured()) {
+        try {
+          const sbRes = await signUpWithSupabase({
+            email: cleanEmail,
+            password: cleanPassword,
+            fullName: cleanName
+          });
+
+          if (!sbRes.success) {
+            setIsLoading(false);
+            if (sbRes.code === "ACCOUNT_EXISTS") {
+              setMode("signin");
+              setMessage(sbRes.message || "Este e-mail já possui uma conta criada. Digite a sua palavra-passe para entrar.");
+            } else {
+              setError(sbRes.message || "Não foi possível concluir o registo no Supabase.");
+            }
+            return;
+          }
+
+          // Se a confirmação de e-mail estiver ativa no Supabase
+          if (sbRes.emailConfirmationRequired) {
+            setIsLoading(false);
+            setMessage("Conta criada no Supabase com sucesso! Enviámos uma mensagem para " + cleanEmail + ". Por favor, confirme o e-mail antes de aceder.");
+            setMode("signin");
+            return;
+          }
+
+          // Sincronizar criação no backend para ativar auditoria e período de 3 dias
+          try {
+            await apiRequest<{ success: boolean; user?: any }>("/api/register-user", {
+              method: "POST",
+              body: JSON.stringify({ 
+                email: cleanEmail, 
+                name: cleanName, 
+                password: cleanPassword,
+                isRegistration: true,
+                supabaseUid: sbRes.user?.id
+              })
+            });
+          } catch (syncErr) {
+            console.warn("Aviso ao sincronizar registo Supabase com o backend:", syncErr);
+          }
+
+          setIsLoading(false);
+          setMessage("Conta criada com sucesso! 3 dias de teste gratuito ativados.");
+          setTimeout(() => {
+            onLoginSuccess(cleanEmail, cleanName, "Free");
+          }, 500);
+          return;
+        } catch (err: any) {
+          setIsLoading(false);
+          setError(err.message || "Erro inesperado ao registar com o Supabase.");
+          return;
+        }
+      }
+
+      // Prioridade 2: Backend Express integrado se o Supabase não estiver configurado
       try {
         const data = await apiRequest<{ success: boolean; user?: any }>("/api/register-user", {
           method: "POST",
@@ -210,7 +282,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         }
       } catch (err: any) {
         setIsLoading(false);
-        // Se a conta já existe, troca suavemente para Iniciar Sessão sem gerar erro confuso
         if (err instanceof ApiError && (err.code === "ACCOUNT_EXISTS" || err.status === 409)) {
           setMode("signin");
           setMessage("Este e-mail já possui uma conta criada. Digite a sua palavra-passe para entrar.");
@@ -223,6 +294,51 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
     // 3. FLUXO: INICIAR SESSÃO (LOGIN DIRETO)
     setIsLoading(true);
+
+    // Prioridade 1: Se o Supabase estiver configurado, utilizar supabase.auth.signInWithPassword()
+    if (isSupabaseConfigured()) {
+      try {
+        const sbRes = await signInWithSupabase({
+          email: cleanEmail,
+          password: cleanPassword
+        });
+
+        if (!sbRes.success) {
+          setIsLoading(false);
+          setError(sbRes.message || "Credenciais inválidas no Supabase.");
+          return;
+        }
+
+        // Sincronizar com o backend para obter plano e registo de sessão
+        let userPlan: "Free" | "Premium" = cleanEmail === "chillplaces9@gmail.com" ? "Premium" : "Free";
+        let userName = sbRes.user?.name || cleanNameFallback(cleanEmail);
+
+        try {
+          const syncData = await apiRequest<{ success: boolean; user?: any; plan?: "Free" | "Premium" }>("/api/login", {
+            method: "POST",
+            body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+          });
+          if (syncData?.user?.plan) {
+            userPlan = syncData.user.plan;
+          }
+          if (syncData?.user?.name) {
+            userName = syncData.user.name;
+          }
+        } catch (syncErr) {
+          console.warn("Aviso ao sincronizar login Supabase com o backend:", syncErr);
+        }
+
+        setIsLoading(false);
+        onLoginSuccess(cleanEmail, userName, userPlan);
+        return;
+      } catch (err: any) {
+        setIsLoading(false);
+        setError(err.message || "Erro inesperado ao iniciar sessão no Supabase.");
+        return;
+      }
+    }
+
+    // Prioridade 2: Backend Express integrado se o Supabase não estiver configurado
     try {
       const data = await apiRequest<{ success: boolean; user?: any }>("/api/login", {
         method: "POST",

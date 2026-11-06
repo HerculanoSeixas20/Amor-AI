@@ -103,5 +103,12 @@
     "event": "Comprovativo enviado automaticamente por interação do utilizador",
     "user": "teste_amor_ia_2026@gmail.com",
     "timestamp": "2026-11-06T17:02:32.939Z"
+  },
+  {
+    "id": "H-57C2O2RWW",
+    "paymentId": "PAY-F3A7GJSJX",
+    "event": "Comprovativo enviado automaticamente por interação do utilizador",
+    "user": "mario_teste_supabase@gmail.com",
+    "timestamp": "2026-11-06T17:11:07.425Z"
   }
 ]

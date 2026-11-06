@@ -267,5 +267,24 @@
     "auditLogs": [
       "[2026-11-06T17:02:32.926Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
     ]
+  },
+  {
+    "paymentId": "PAY-F3A7GJSJX",
+    "transactionId": "TX-DZBWSO",
+    "email": "mario_teste_supabase@gmail.com",
+    "name": "Mário Supabase",
+    "plan": "Plano Premium VIP Mensal",
+    "value": "3.000 Kzs",
+    "method": "Multicaixa Express (Automático)",
+    "phone": "923000000",
+    "date": "06/11/2026",
+    "time": "17:11:07",
+    "receiptUrl": "/uploads/auto_receipt_placeholder.png",
+    "status": "pending_confirmation",
+    "createdAt": "2026-11-06T17:11:07.412Z",
+    "updatedAt": "2026-11-06T17:11:07.412Z",
+    "auditLogs": [
+      "[2026-11-06T17:11:07.412Z] Pagamento e comprovativo de subscrição iniciados automaticamente no login/registo para avaliação do Administrador."
+    ]
   }
 ]
